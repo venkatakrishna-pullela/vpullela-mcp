@@ -13,22 +13,22 @@
 # limitations under the License.
 """Test configuration and fixtures for AWS Security Hub MCP Server."""
 
-import pytest
 from datetime import datetime
-from unittest.mock import Mock, patch
-import boto3
+from unittest.mock import Mock
+
+import pytest
 
 
 @pytest.fixture
 def mock_security_hub_client():
     """Mock Security Hub client for testing."""
     client = Mock()
-    client.get_findings.return_value = {'Findings': []}
-    client.get_enabled_standards.return_value = {'StandardsSubscriptions': []}
-    client.describe_standards.return_value = {'Standards': []}
-    client.describe_standards_controls.return_value = {'Controls': []}
-    client.get_insights.return_value = {'Insights': []}
-    client.batch_update_findings.return_value = {'ProcessedFindings': [], 'UnprocessedFindings': []}
+    client.get_findings.return_value = {"Findings": []}
+    client.get_enabled_standards.return_value = {"StandardsSubscriptions": []}
+    client.describe_standards.return_value = {"Standards": []}
+    client.describe_standards_controls.return_value = {"Controls": []}
+    client.get_insights.return_value = {"Insights": []}
+    client.batch_update_findings.return_value = {"ProcessedFindings": [], "UnprocessedFindings": []}
     yield client
 
 
@@ -36,30 +36,20 @@ def mock_security_hub_client():
 def sample_finding():
     """Sample Security Hub finding for testing."""
     return {
-        'Id': 'arn:aws:securityhub:us-east-1:123456789012:finding/test-finding-1',
-        'ProductArn': 'arn:aws:securityhub:us-east-1:123456789012:product/123456789012/default',
-        'GeneratorId': 'test-generator',
-        'AwsAccountId': '123456789012',
-        'Region': 'us-east-1',
-        'Title': 'Test Security Finding',
-        'Description': 'This is a test security finding',
-        'Severity': {
-            'Label': 'HIGH',
-            'Normalized': 70
-        },
-        'Workflow': {
-            'Status': 'NEW'
-        },
-        'RecordState': 'ACTIVE',
-        'CreatedAt': datetime.utcnow(),
-        'UpdatedAt': datetime.utcnow(),
-        'Resources': [{
-            'Type': 'AwsEc2Instance',
-            'Id': 'i-1234567890abcdef0'
-        }],
-        'Compliance': {
-            'Status': 'FAILED'
-        }
+        "Id": "arn:aws:securityhub:us-east-1:123456789012:finding/test-finding-1",
+        "ProductArn": "arn:aws:securityhub:us-east-1:123456789012:product/123456789012/default",
+        "GeneratorId": "test-generator",
+        "AwsAccountId": "123456789012",
+        "Region": "us-east-1",
+        "Title": "Test Security Finding",
+        "Description": "This is a test security finding",
+        "Severity": {"Label": "HIGH", "Normalized": 70},
+        "Workflow": {"Status": "NEW"},
+        "RecordState": "ACTIVE",
+        "CreatedAt": datetime.utcnow(),
+        "UpdatedAt": datetime.utcnow(),
+        "Resources": [{"Type": "AwsEc2Instance", "Id": "i-1234567890abcdef0"}],
+        "Compliance": {"Status": "FAILED"},
     }
 
 
@@ -67,10 +57,10 @@ def sample_finding():
 def sample_standard():
     """Sample Security Hub standard for testing."""
     return {
-        'StandardsArn': 'arn:aws:securityhub:::standard/aws-foundational-security-standard/v/1.0.0',
-        'Name': 'AWS Foundational Security Standard',
-        'Description': 'AWS Foundational Security Standard',
-        'EnabledByDefault': True
+        "StandardsArn": "arn:aws:securityhub:::standard/aws-foundational-security-standard/v/1.0.0",
+        "Name": "AWS Foundational Security Standard",
+        "Description": "AWS Foundational Security Standard",
+        "EnabledByDefault": True,
     }
 
 
