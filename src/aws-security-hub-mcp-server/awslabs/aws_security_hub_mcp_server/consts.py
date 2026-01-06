@@ -11,6 +11,29 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""AWS Security Hub MCP Server."""
+"""Constants for AWS Security Hub MCP Server."""
 
-__version__ = "1.0.0"
+# Default configuration values
+DEFAULT_AWS_REGION = "us-east-1"
+DEFAULT_MAX_RESULTS = 50
+DEFAULT_DAYS_BACK = 30
+DEFAULT_LOG_LEVEL = "WARNING"
+
+# AWS Security Hub API limits
+AWS_MAX_RESULTS_PER_PAGE = 100
+MAX_PAGINATION_PAGES = 50
+
+# Security score calculation weights
+SEVERITY_WEIGHTS = {
+    "CRITICAL": 10,
+    "HIGH": 7,
+    "MEDIUM": 4,
+    "LOW": 2,
+    "INFORMATIONAL": 1,
+}
+
+# Environment variable names
+ENV_AWS_PROFILE = "AWS_PROFILE"
+ENV_AWS_REGION = "AWS_REGION"
+ENV_LOG_LEVEL = "FASTMCP_LOG_LEVEL"
+ENV_MAX_RESULTS = "SECURITY_HUB_MAX_RESULTS"

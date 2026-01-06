@@ -15,7 +15,6 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -78,29 +77,6 @@ class SecurityFinding(BaseModel):
     source_url: str | None = Field(description="URL to the original finding source")
 
 
-class ComplianceSummary(BaseModel):
-    """Summary of compliance status across standards."""
-
-    standard_name: str = Field(description="Name of the security standard")
-    standard_arn: str = Field(description="ARN of the security standard")
-    enabled: bool = Field(description="Whether the standard is enabled")
-    passed_controls: int = Field(description="Number of controls that passed")
-    failed_controls: int = Field(description="Number of controls that failed")
-    warning_controls: int = Field(description="Number of controls with warnings")
-    not_available_controls: int = Field(description="Number of controls not available")
-    total_controls: int = Field(description="Total number of controls")
-    compliance_percentage: float = Field(description="Overall compliance percentage")
-
-
-class SecurityInsight(BaseModel):
-    """Represents a Security Hub insight."""
-
-    insight_arn: str = Field(description="ARN of the insight")
-    name: str = Field(description="Name of the insight")
-    filters: dict[str, Any] = Field(description="Filters used by the insight")
-    group_by_attribute: str = Field(description="Attribute used for grouping results")
-
-
 class FindingStatistics(BaseModel):
     """Statistics about security findings."""
 
@@ -114,25 +90,28 @@ class SecurityScore(BaseModel):
 
     current_score: float = Field(description="Current security score (0-100)")
     max_score: float = Field(description="Maximum possible score")
-    score_date: datetime = Field(description="Date when the score was calculated")
+    score_date: str = Field(description="Date when the score was calculated")
     control_findings_count: int = Field(description="Number of control findings")
     security_score_percentage: float = Field(description="Security score as percentage")
 
 
-class StandardControl(BaseModel):
-    """Represents a security standard control."""
+class EnabledStandard(BaseModel):
+    """Represents an enabled security standard."""
 
-    control_id: str = Field(description="ID of the control")
-    title: str = Field(description="Title of the control")
-    description: str = Field(description="Description of the control")
-    control_status: str = Field(description="Status of the control (ENABLED/DISABLED)")
+    standards_arn: str = Field(description="ARN of the security standard")
+    standards_subscription_arn: str = Field(description="ARN of the standards subscription")
+    standards_status: str = Field(description="Status of the standard (ENABLED/DISABLED)")
+    standards_status_reason: str | None = Field(description="Reason for the status")
+    name: str = Field(description="Name of the security standard")
+    description: str | None = Field(description="Description of the security standard")
+
+
+class SecurityControlDefinition(BaseModel):
+    """Represents a security control definition."""
+
+    security_control_id: str = Field(description="ID of the security control")
+    title: str = Field(description="Title of the security control")
+    description: str = Field(description="Description of the security control")
+    remediation_url: str | None = Field(description="URL with remediation guidance")
     severity_rating: SeverityLabel = Field(description="Severity rating of the control")
-    related_requirements: list[str] = Field(description="Related compliance requirements")
-
-
-class UpdateFindingRequest(BaseModel):
-    """Request to update finding workflow status."""
-
-    finding_identifiers: list[str] = Field(description="List of finding ARNs to update")
-    workflow_status: WorkflowStatus = Field(description="New workflow status")
-    note: str | None = Field(description="Note to add to the finding")
+    current_region_availability: str = Field(description="Availability in current region")

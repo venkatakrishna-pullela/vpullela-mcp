@@ -13,7 +13,6 @@
 # limitations under the License.
 """Tests for AWS Security Hub MCP Server."""
 
-from datetime import datetime
 from unittest.mock import patch
 
 import pytest
@@ -24,13 +23,10 @@ from awslabs.aws_security_hub_mcp_server.models import (
     WorkflowStatus,
 )
 from awslabs.aws_security_hub_mcp_server.server import (
-    get_compliance_summary,
     get_finding_statistics,
-    get_insights,
     get_security_findings,
     get_security_score,
     parse_finding,
-    update_finding_workflow,
 )
 
 
@@ -77,60 +73,6 @@ class TestSecurityHubServer:
             assert "UpdatedAt" in filters
 
     @pytest.mark.asyncio
-    async def test_get_compliance_summary_success(self, mock_context, sample_standard):
-        """Test successful retrieval of compliance summary."""
-        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
-            # Mock the various API calls
-            mock_client.return_value.get_enabled_standards.return_value = {
-                "StandardsSubscriptions": [
-                    {
-                        "StandardsArn": sample_standard["StandardsArn"],
-                        "StandardsSubscriptionArn": "arn:aws:securityhub:us-east-1:123456789012:subscription/aws-foundational-security-standard/v/1.0.0",
-                        "StandardsStatus": "ENABLED",
-                    }
-                ]
-            }
-
-            mock_client.return_value.describe_standards.return_value = {"Standards": [sample_standard]}
-
-            mock_client.return_value.describe_standards_controls.return_value = {
-                "Controls": [{"ControlId": "test-control-1"}, {"ControlId": "test-control-2"}]
-            }
-
-            # Mock findings response for controls
-            mock_client.return_value.get_findings.return_value = {
-                "Findings": []  # No findings means control is passing
-            }
-
-            summaries = await get_compliance_summary(mock_context)
-
-            assert len(summaries) == 1
-            assert summaries[0].standard_name == sample_standard["Name"]
-            assert summaries[0].enabled is True
-            assert summaries[0].total_controls == 2
-
-    @pytest.mark.asyncio
-    async def test_get_insights_success(self, mock_context):
-        """Test successful retrieval of insights."""
-        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
-            mock_client.return_value.get_insights.return_value = {
-                "Insights": [
-                    {
-                        "InsightArn": "arn:aws:securityhub:us-east-1:123456789012:insight/test-insight",
-                        "Name": "Test Insight",
-                        "Filters": {"SeverityLabel": [{"Value": "HIGH", "Comparison": "EQUALS"}]},
-                        "GroupByAttribute": "ResourceType",
-                    }
-                ]
-            }
-
-            insights = await get_insights(mock_context, max_results=10)
-
-            assert len(insights) == 1
-            assert insights[0].name == "Test Insight"
-            assert insights[0].group_by_attribute == "ResourceType"
-
-    @pytest.mark.asyncio
     async def test_get_finding_statistics_success(self, mock_context, sample_finding):
         """Test successful retrieval of finding statistics."""
         with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
@@ -155,26 +97,6 @@ class TestSecurityHubServer:
             assert stats[1].percentage == 33.33
 
     @pytest.mark.asyncio
-    async def test_update_finding_workflow_success(self, mock_context):
-        """Test successful update of finding workflow status."""
-        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
-            mock_client.return_value.batch_update_findings.return_value = {
-                "ProcessedFindings": [{"Id": "finding-1"}, {"Id": "finding-2"}],
-                "UnprocessedFindings": [],
-            }
-
-            result = await update_finding_workflow(
-                mock_context,
-                finding_ids=["finding-1", "finding-2"],
-                workflow_status=WorkflowStatus.RESOLVED,
-                note="Fixed the issue",
-            )
-
-            assert "Successfully updated 2 findings" in result
-            assert "RESOLVED" in result
-            assert "Fixed the issue" in result
-
-    @pytest.mark.asyncio
     async def test_get_security_score_success(self, mock_context, sample_finding):
         """Test successful calculation of security score."""
         with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
@@ -192,7 +114,7 @@ class TestSecurityHubServer:
             assert score.max_score == 100.0
             assert 0 <= score.current_score <= 100
             assert score.security_score_percentage == score.current_score
-            assert isinstance(score.score_date, datetime)
+            assert isinstance(score.score_date, str)  # Changed from datetime to str
 
     def test_parse_finding_success(self, sample_finding):
         """Test successful parsing of finding data."""
