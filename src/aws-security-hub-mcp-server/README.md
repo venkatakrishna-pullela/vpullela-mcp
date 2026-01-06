@@ -6,6 +6,7 @@ This MCP server provides tools to interact with AWS Security Hub, enabling secur
 
 ## Features
 
+### Core Data Retrieval Tools
 - **Get Security Findings**: Retrieve and filter security findings from Security Hub
 - **Get Finding Statistics**: Analyze security findings with aggregated statistics  
 - **Get Security Score**: Calculate overall security posture score
@@ -13,6 +14,11 @@ This MCP server provides tools to interact with AWS Security Hub, enabling secur
 - **List Security Control Definitions**: Browse available security controls
 - **Get Finding History**: Track changes to specific findings over time
 - **Describe Standards Controls**: Get detailed control information for standards
+
+### Advanced Report Generation Tools
+- **Generate Security Report**: Comprehensive security analysis with executive summary, findings breakdown, and actionable recommendations
+- **Generate Compliance Report**: Standards-focused compliance analysis with control status and compliance recommendations
+- **Generate Security Trends Report**: Historical trend analysis to identify patterns and security posture changes over time
 
 ## Prerequisites
 
@@ -51,16 +57,18 @@ This MCP server provides tools to interact with AWS Security Hub, enabling secur
 
 ## Installation
 
-| Cursor | VS Code |
-|:------:|:-------:|
-| [![Install MCP Server](https://cursor.com/deeplink/mcp-install-light.svg)](https://cursor.com/en/install-mcp?name=awslabs.aws-security-hub-mcp-server&config=eyJjb21tYW5kIjoidXZ4IGF3c2xhYnMuYXdzLXNlY3VyaXR5LWh1Yi1tY3Atc2VydmVyQGxhdGVzdCIsImVudiI6eyJGQVNUTUNQX0xPR19MRVZFTCI6IkVSUk9SIiwiQVdTX1BST0ZJTEUiOiJ5b3VyLWF3cy1wcm9maWxlIiwiQVdTX1JFR0lPTiI6InVzLWVhc3QtMSJ9LCJkaXNhYmxlZCI6ZmFsc2UsImF1dG9BcHByb3ZlIjpbXX0%3D) | [![Install on VS Code](https://img.shields.io/badge/Install_on-VS_Code-FF9900?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=AWS%20Security%20Hub%20MCP%20Server&config=%7B%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22awslabs.aws-security-hub-mcp-server%40latest%22%5D%2C%22env%22%3A%7B%22FASTMCP_LOG_LEVEL%22%3A%22ERROR%22%2C%22AWS_PROFILE%22%3A%22your-aws-profile%22%2C%22AWS_REGION%22%3A%22us-east-1%22%7D%2C%22disabled%22%3Afalse%2C%22autoApprove%22%3A%5B%5D%7D) |
+| Kiro   | Cursor  | VS Code |
+|:------:|:-------:|:-------:|
+| [![Kiro](https://img.shields.io/badge/Install-Kiro-9046FF?style=flat-square&logo=kiro)](https://kiro.dev/launch/mcp/add?name=awslabs.aws-security-hub-mcp-server&config=%7B%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22awslabs.aws-security-hub-mcp-server%40latest%22%5D%2C%22env%22%3A%7B%22FASTMCP_LOG_LEVEL%22%3A%22ERROR%22%2C%22AWS_PROFILE%22%3A%22your-aws-profile%22%2C%22AWS_REGION%22%3A%22us-east-1%22%7D%7D) | [![Install MCP Server](https://cursor.com/deeplink/mcp-install-light.svg)](https://cursor.com/en/install-mcp?name=awslabs.aws-security-hub-mcp-server&config=eyJjb21tYW5kIjoidXZ4IGF3c2xhYnMuYXdzLXNlY3VyaXR5LWh1Yi1tY3Atc2VydmVyQGxhdGVzdCIsImVudiI6eyJGQVNUTUNQX0xPR19MRVZFTCI6IkVSUk9SIiwiQVdTX1BST0ZJTEUiOiJ5b3VyLWF3cy1wcm9maWxlIiwiQVdTX1JFR0lPTiI6InVzLWVhc3QtMSJ9LCJkaXNhYmxlZCI6ZmFsc2UsImF1dG9BcHByb3ZlIjpbXX0%3D) | [![Install on VS Code](https://img.shields.io/badge/Install_on-VS_Code-FF9900?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=AWS%20Security%20Hub%20MCP%20Server&config=%7B%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22awslabs.aws-security-hub-mcp-server%40latest%22%5D%2C%22env%22%3A%7B%22FASTMCP_LOG_LEVEL%22%3A%22ERROR%22%2C%22AWS_PROFILE%22%3A%22your-aws-profile%22%2C%22AWS_REGION%22%3A%22us-east-1%22%7D%2C%22disabled%22%3Afalse%2C%22autoApprove%22%3A%5B%5D%7D) |
 
-Configure the MCP server in your MCP client configuration:
+> **Note:** The install buttons above configure `AWS_REGION` to `us-east-1` by default. Update this value in your MCP configuration after installation if you need a different region.
+
+Add the MCP server to your configuration file (for [Kiro](https://kiro.dev/docs/mcp/) add to `.kiro/settings/mcp.json` - see [configuration path](https://kiro.dev/docs/cli/mcp/configuration/#mcp-server-loading-priority)):
 
 ```json
 {
   "mcpServers": {
-    "aws-security-hub-mcp-server": {
+    "awslabs.aws-security-hub-mcp-server": {
       "command": "uvx",
       "args": ["awslabs.aws-security-hub-mcp-server@latest"],
       "env": {
@@ -75,17 +83,27 @@ Configure the MCP server in your MCP client configuration:
 }
 ```
 
-For [Amazon Q Developer CLI](https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/command-line.html), add the MCP client configuration and tool command to the agent file in `~/.aws/amazonq/cli-agents`.
+Configure the MCP server in your MCP client configuration (e.g., for Amazon Q Developer CLI, edit `~/.aws/amazonq/mcp.json`):
 
-Example, `~/.aws/amazonq/cli-agents/default.json`
+### Windows Installation
+
+For Windows users, the MCP server configuration format is slightly different:
 
 ```json
 {
-  "version": "1.0",
   "mcpServers": {
-    "aws-security-hub-mcp-server": {
-      "command": "uvx",
-      "args": ["awslabs.aws-security-hub-mcp-server@latest"],
+    "awslabs.aws-security-hub-mcp-server": {
+      "disabled": false,
+      "timeout": 60,
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "tool",
+        "run",
+        "--from",
+        "awslabs.aws-security-hub-mcp-server@latest",
+        "awslabs.aws-security-hub-mcp-server.exe"
+      ],
       "env": {
         "FASTMCP_LOG_LEVEL": "ERROR",
         "AWS_PROFILE": "your-aws-profile",
@@ -106,6 +124,8 @@ Example, `~/.aws/amazonq/cli-agents/default.json`
 - `SECURITY_HUB_MAX_RESULTS`: Maximum number of results to return per query (default: 50)
 
 ## Tools
+
+### Core Data Retrieval Tools
 
 ### get-security-findings
 Retrieves security findings from AWS Security Hub with comprehensive filtering capabilities. You can filter by severity levels (CRITICAL, HIGH, MEDIUM, LOW), compliance status (PASSED, FAILED), workflow status (NEW, NOTIFIED, RESOLVED), resource types, and time ranges. This tool supports pagination to handle large datasets and returns detailed finding information including remediation guidance and affected resources.
@@ -142,6 +162,45 @@ Provides detailed information about the specific controls within enabled securit
 
 **Example:** *"Show me all controls in the AWS Foundational Security Best Practices standard and their current status"*
 
+### Advanced Report Generation Tools
+
+### generate-security-report
+Creates comprehensive security analysis reports with executive summaries, findings breakdown by severity, actionable recommendations, and security standards status. This tool provides structured insights perfect for security dashboards, executive briefings, and security posture assessments. You can customize the level of detail and limit findings per severity level.
+
+**Key Features:**
+- Executive summary with security score and findings overview
+- Detailed findings by severity level with remediation guidance
+- Actionable security recommendations prioritized by risk
+- Security standards status and compliance analysis
+- Customizable detail level and finding limits
+
+**Example:** *"Generate a comprehensive security report for the last 30 days with detailed findings for executive review"*
+
+### generate-compliance-report
+Produces standards-focused compliance reports analyzing adherence to enabled security standards, control status, and compliance recommendations. This tool categorizes compliance findings by type (Configuration, Access Control, Monitoring, etc.) and provides compliance-specific recommendations based on AWS Security Hub compliance data.
+
+**Key Features:**
+- Overall compliance percentage and standards analysis
+- Control-level compliance details with status tracking
+- Compliance findings categorized by security domain
+- Standards-specific compliance status and recommendations
+- Integration with AWS Config and Security Hub compliance data
+
+**Example:** *"Create a compliance report showing our adherence to CIS and AWS Foundational Security standards"*
+
+### generate-security-trends-report
+Generates historical trend analysis reports to identify patterns, improvements, or deteriorations in security posture over multiple time periods. This tool uses only actual Security Hub data to prevent hallucination and provides statistical analysis, period comparisons, and actionable insights based on trend patterns.
+
+**Key Features:**
+- Historical analysis across multiple time periods (7, 14, 30, 90 days by default)
+- Trend analysis for severity levels, compliance status, and resource types
+- Security score progression over time with statistical insights
+- Period-to-period comparisons and change analysis
+- Actionable insights and recommendations based on detected trends
+- Data quality assessment and reliability scoring
+
+**Example:** *"Analyze security trends over the past 90 days to identify if our security posture is improving or declining"*
+
 ## Development
 
 ### Local Development
@@ -156,7 +215,7 @@ Provides detailed information about the specific controls within enabled securit
 
 The server includes comprehensive tests:
 
-- **Unit tests**: Mock-based tests for all 7 tools covering success cases, error handling, and edge cases
+- **Unit tests**: Mock-based tests for all 10 tools covering success cases, error handling, and edge cases
 - **Integration tests**: MCP protocol tests for server functionality
 
 Run tests with:
