@@ -59,9 +59,9 @@ This MCP server provides tools to interact with AWS Security Hub, enabling secur
 
 | Kiro   | Cursor  | VS Code |
 |:------:|:-------:|:-------:|
-| [![Kiro](https://img.shields.io/badge/Install-Kiro-9046FF?style=flat-square&logo=kiro)](https://kiro.dev/launch/mcp/add?name=awslabs.aws-security-hub-mcp-server&config=%7B%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22awslabs.aws-security-hub-mcp-server%40latest%22%5D%2C%22env%22%3A%7B%22FASTMCP_LOG_LEVEL%22%3A%22ERROR%22%2C%22AWS_PROFILE%22%3A%22your-aws-profile%22%2C%22AWS_REGION%22%3A%22us-east-1%22%7D%7D) | [![Install MCP Server](https://cursor.com/deeplink/mcp-install-light.svg)](https://cursor.com/en/install-mcp?name=awslabs.aws-security-hub-mcp-server&config=eyJjb21tYW5kIjoidXZ4IGF3c2xhYnMuYXdzLXNlY3VyaXR5LWh1Yi1tY3Atc2VydmVyQGxhdGVzdCIsImVudiI6eyJGQVNUTUNQX0xPR19MRVZFTCI6IkVSUk9SIiwiQVdTX1BST0ZJTEUiOiJ5b3VyLWF3cy1wcm9maWxlIiwiQVdTX1JFR0lPTiI6InVzLWVhc3QtMSJ9LCJkaXNhYmxlZCI6ZmFsc2UsImF1dG9BcHByb3ZlIjpbXX0%3D) | [![Install on VS Code](https://img.shields.io/badge/Install_on-VS_Code-FF9900?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=AWS%20Security%20Hub%20MCP%20Server&config=%7B%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22awslabs.aws-security-hub-mcp-server%40latest%22%5D%2C%22env%22%3A%7B%22FASTMCP_LOG_LEVEL%22%3A%22ERROR%22%2C%22AWS_PROFILE%22%3A%22your-aws-profile%22%2C%22AWS_REGION%22%3A%22us-east-1%22%7D%2C%22disabled%22%3Afalse%2C%22autoApprove%22%3A%5B%5D%7D) |
+| [![Install Kiro](https://img.shields.io/badge/Install-Kiro-9046FF?style=flat-square&logo=kiro)](https://kiro.dev/launch/mcp/add?name=awslabs.aws-security-hub-mcp-server&config=%7B%22command%22%3A%20%22uvx%22%2C%20%22args%22%3A%20%5B%22awslabs.aws-security-hub-mcp-server%40latest%22%5D%2C%20%22env%22%3A%20%7B%22FASTMCP_LOG_LEVEL%22%3A%20%22ERROR%22%2C%20%22AWS_PROFILE%22%3A%20%22default%22%2C%20%22AWS_REGION%22%3A%20%22us-east-1%22%7D%2C%20%22disabled%22%3A%20false%2C%20%22autoApprove%22%3A%20%5B%5D%7D) | [![Install MCP Server](https://cursor.com/deeplink/mcp-install-light.svg)](https://cursor.com/en/install-mcp?name=awslabs.aws-security-hub-mcp-server&config=eyJjb21tYW5kIjoidXZ4IGF3c2xhYnMuYXdzLXNlY3VyaXR5LWh1Yi1tY3Atc2VydmVyQGxhdGVzdCIsImVudiI6eyJGQVNUTUNQX0xPR19MRVZFTCI6IkVSUk9SIiwiQVdTX1BST0ZJTEUiOiJ5b3VyLWF3cy1wcm9maWxlIiwiQVdTX1JFR0lPTiI6InVzLWVhc3QtMSJ9LCJkaXNhYmxlZCI6ZmFsc2UsImF1dG9BcHByb3ZlIjpbXX0%3D) | [![Install on VS Code](https://img.shields.io/badge/Install_on-VS_Code-FF9900?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=AWS%20Security%20Hub%20MCP%20Server&config=%7B%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22awslabs.aws-security-hub-mcp-server%40latest%22%5D%2C%22env%22%3A%7B%22FASTMCP_LOG_LEVEL%22%3A%22ERROR%22%2C%22AWS_PROFILE%22%3A%22your-aws-profile%22%2C%22AWS_REGION%22%3A%22us-east-1%22%7D%2C%22disabled%22%3Afalse%2C%22autoApprove%22%3A%5B%5D%7D) |
 
-> **Note:** The install buttons above configure `AWS_REGION` to `us-east-1` by default. Update this value in your MCP configuration after installation if you need a different region.
+> **Note:** The install buttons above configure `AWS_REGION` to `us-east-1` and `AWS_PROFILE` to `default` by default. Update these values in your MCP configuration after installation if you need different settings.
 
 Add the MCP server to your configuration file (for [Kiro](https://kiro.dev/docs/mcp/) add to `.kiro/settings/mcp.json` - see [configuration path](https://kiro.dev/docs/cli/mcp/configuration/#mcp-server-loading-priority)):
 
@@ -73,7 +73,7 @@ Add the MCP server to your configuration file (for [Kiro](https://kiro.dev/docs/
       "args": ["awslabs.aws-security-hub-mcp-server@latest"],
       "env": {
         "FASTMCP_LOG_LEVEL": "ERROR",
-        "AWS_PROFILE": "your-aws-profile",
+        "AWS_PROFILE": "default",
         "AWS_REGION": "us-east-1"
       },
       "disabled": false,
@@ -106,7 +106,7 @@ For Windows users, the MCP server configuration format is slightly different:
       ],
       "env": {
         "FASTMCP_LOG_LEVEL": "ERROR",
-        "AWS_PROFILE": "your-aws-profile",
+        "AWS_PROFILE": "default",
         "AWS_REGION": "us-east-1"
       }
     }
@@ -118,7 +118,7 @@ For Windows users, the MCP server configuration format is slightly different:
 
 ### Environment Variables
 
-- `AWS_PROFILE`: AWS profile to use (optional, defaults to default profile)
+- `AWS_PROFILE`: AWS profile to use (optional, defaults to "default" profile)
 - `AWS_REGION`: AWS region to use (optional, defaults to us-east-1)
 - `FASTMCP_LOG_LEVEL`: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 - `SECURITY_HUB_MAX_RESULTS`: Maximum number of results to return per query (default: 50)
