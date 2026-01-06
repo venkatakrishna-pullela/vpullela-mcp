@@ -51,16 +51,16 @@ This MCP server provides tools to interact with AWS Security Hub, enabling secur
 
 ## Installation
 
-| Cursor | VS Code | Kiro IDE |
-|:------:|:-------:|:--------:|
-| [![Install MCP Server](https://cursor.com/deeplink/mcp-install-light.svg)](https://cursor.com/en/install-mcp?name=awslabs.aws-security-hub-mcp-server&config=eyJjb21tYW5kIjoidXZ4IGF3c2xhYnMuYXdzLXNlY3VyaXR5LWh1Yi1tY3Atc2VydmVyQGxhdGVzdCIsImVudiI6eyJGQVNUTUNQX0xPR19MRVZFTCI6IkVSUk9SIiwiQVdTX1BST0ZJTEUiOiJ5b3VyLWF3cy1wcm9maWxlIiwiQVdTX1JFR0lPTiI6InVzLWVhc3QtMSJ9LCJkaXNhYmxlZCI6ZmFsc2UsImF1dG9BcHByb3ZlIjpbXX0%3D) | [![Install on VS Code](https://img.shields.io/badge/Install_on-VS_Code-FF9900?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=AWS%20Security%20Hub%20MCP%20Server&config=%7B%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22awslabs.aws-security-hub-mcp-server%40latest%22%5D%2C%22env%22%3A%7B%22FASTMCP_LOG_LEVEL%22%3A%22ERROR%22%2C%22AWS_PROFILE%22%3A%22your-aws-profile%22%2C%22AWS_REGION%22%3A%22us-east-1%22%7D%2C%22disabled%22%3Afalse%2C%22autoApprove%22%3A%5B%5D%7D) | [![Install on Kiro](https://img.shields.io/badge/Install_on-Kiro_IDE-6366F1?style=flat-square&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMTMuMDkgOC4yNkwyMCA5TDEzLjA5IDE1Ljc0TDEyIDIyTDEwLjkxIDE1Ljc0TDQgOUwxMC45MSA4LjI2TDEyIDJaIiBmaWxsPSJ3aGl0ZSIvPgo8L3N2Zz4K&logoColor=white)](#kiro-ide-installation) |
+| Cursor | VS Code |
+|:------:|:-------:|
+| [![Install MCP Server](https://cursor.com/deeplink/mcp-install-light.svg)](https://cursor.com/en/install-mcp?name=awslabs.aws-security-hub-mcp-server&config=eyJjb21tYW5kIjoidXZ4IGF3c2xhYnMuYXdzLXNlY3VyaXR5LWh1Yi1tY3Atc2VydmVyQGxhdGVzdCIsImVudiI6eyJGQVNUTUNQX0xPR19MRVZFTCI6IkVSUk9SIiwiQVdTX1BST0ZJTEUiOiJ5b3VyLWF3cy1wcm9maWxlIiwiQVdTX1JFR0lPTiI6InVzLWVhc3QtMSJ9LCJkaXNhYmxlZCI6ZmFsc2UsImF1dG9BcHByb3ZlIjpbXX0%3D) | [![Install on VS Code](https://img.shields.io/badge/Install_on-VS_Code-FF9900?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=AWS%20Security%20Hub%20MCP%20Server&config=%7B%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22awslabs.aws-security-hub-mcp-server%40latest%22%5D%2C%22env%22%3A%7B%22FASTMCP_LOG_LEVEL%22%3A%22ERROR%22%2C%22AWS_PROFILE%22%3A%22your-aws-profile%22%2C%22AWS_REGION%22%3A%22us-east-1%22%7D%2C%22disabled%22%3Afalse%2C%22autoApprove%22%3A%5B%5D%7D) |
 
 Configure the MCP server in your MCP client configuration:
 
 ```json
 {
   "mcpServers": {
-    "aws-security-hub": {
+    "aws-security-hub-mcp-server": {
       "command": "uvx",
       "args": ["awslabs.aws-security-hub-mcp-server@latest"],
       "env": {
@@ -83,7 +83,7 @@ Example, `~/.aws/amazonq/cli-agents/default.json`
 {
   "version": "1.0",
   "mcpServers": {
-    "aws-security-hub": {
+    "aws-security-hub-mcp-server": {
       "command": "uvx",
       "args": ["awslabs.aws-security-hub-mcp-server@latest"],
       "env": {
@@ -95,43 +95,6 @@ Example, `~/.aws/amazonq/cli-agents/default.json`
   }
 }
 ```
-
-### Kiro IDE Installation
-
-For [Kiro IDE](https://kiro.ai), add the MCP server configuration to your workspace settings:
-
-1. **Create or edit** `.kiro/settings/mcp.json` in your workspace root:
-
-```json
-{
-  "mcpServers": {
-    "aws-security-hub": {
-      "command": "uvx",
-      "args": ["awslabs.aws-security-hub-mcp-server@latest"],
-      "env": {
-        "FASTMCP_LOG_LEVEL": "ERROR",
-        "AWS_PROFILE": "your-aws-profile",
-        "AWS_REGION": "us-east-1"
-      },
-      "disabled": false,
-      "autoApprove": [
-        "get-security-findings",
-        "get-finding-statistics", 
-        "get-security-score",
-        "get-enabled-standards",
-        "list-security-control-definitions",
-        "get-finding-history",
-        "describe-standards-controls"
-      ]
-    }
-  }
-}
-```
-
-2. **Restart Kiro** or use the MCP Server view in the Kiro feature panel to reconnect
-3. **Start using** the tools by asking Kiro: *"Show me my AWS Security Hub findings"*
-
-> **Note**: The `autoApprove` array allows Kiro to use these tools without asking for permission each time, making the experience smoother for security analysis workflows.
 
 ## Configuration
 
@@ -194,7 +157,7 @@ Provides detailed information about the specific controls within enabled securit
 The server includes comprehensive tests:
 
 - **Unit tests**: Mock-based tests for all 7 tools covering success cases, error handling, and edge cases
-- **Integration tests**: MCP protocol tests (currently skipped due to missing test utilities)
+- **Integration tests**: MCP protocol tests for server functionality
 
 Run tests with:
 ```bash
@@ -207,8 +170,6 @@ uv run pytest --cov --cov-branch --cov-report=term-missing
 # Run only unit tests (recommended for development)
 uv run pytest tests/test_server.py -v
 ```
-
-**Current test status**: 7 unit tests passing, integration tests skipped (require additional test framework setup).
 
 ## Security Considerations
 
@@ -265,8 +226,8 @@ Enable debug logging by setting `FASTMCP_LOG_LEVEL=DEBUG` to see detailed API ca
 
 ## Contributing
 
-See the main repository [CONTRIBUTING.md](../../CONTRIBUTING.md) for contribution guidelines.
+See the main repository [CONTRIBUTING.md](https://github.com/awslabs/mcp-server-collection/blob/main/CONTRIBUTING.md) for contribution guidelines.
 
 ## License
 
-This project is licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.
+This project is licensed under the Apache License 2.0. See [LICENSE](https://github.com/awslabs/mcp-server-collection/blob/main/LICENSE) for details.
