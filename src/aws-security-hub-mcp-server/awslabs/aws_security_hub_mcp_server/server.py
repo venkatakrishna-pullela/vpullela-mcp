@@ -403,10 +403,15 @@ async def get_finding_statistics(
             elif group_by == "WorkflowStatus":
                 group_key = finding.get("Workflow", {}).get("Status", "UNKNOWN")
             elif group_by == "ProductName":
-                group_key = finding.get("ProductName", "UNKNOWN")
+                product_fields = finding.get("ProductFields", {})
+                group_key = product_fields.get("aws/securityhub/ProductName", "UNKNOWN")
             elif group_by == "ResourceType":
                 resources = finding.get("Resources", [])
                 group_key = resources[0].get("Type", "UNKNOWN") if resources else "UNKNOWN"
+            elif group_by == "ComplianceStatus":
+                group_key = finding.get("Compliance", {}).get("Status", "UNKNOWN")
+            elif group_by == "RecordState":
+                group_key = finding.get("RecordState", "UNKNOWN")
             else:
                 group_key = "UNKNOWN"
 

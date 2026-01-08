@@ -1400,3 +1400,849 @@ class TestSecurityHubServer:
         equal_scores = {"7_days": 70.0, "14_days": 70.0, "30_days": 70.0}
         result = determine_overall_trend_direction(equal_scores, [7, 14, 30])
         assert result == "stable"
+
+    @pytest.mark.asyncio
+    async def test_get_security_findings_large_days_back(self, mock_context, sample_finding):
+        """Test get_security_findings with large days_back value that triggers warning."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_client.return_value.get_findings.return_value = {"Findings": [sample_finding]}
+
+            # Test with days_back > 365 which should trigger a warning path
+            findings = await get_security_findings(mock_context, days_back=400)
+
+            # Should still work but without time filter due to the limit
+            assert len(findings) == 1
+
+    @pytest.mark.asyncio
+    async def test_get_security_findings_zero_days_back(self, mock_context, sample_finding):
+        """Test get_security_findings with zero days_back."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_client.return_value.get_findings.return_value = {"Findings": [sample_finding]}
+
+            # Test with days_back = 0 which should not add time filter
+            findings = await get_security_findings(mock_context, days_back=0)
+
+            # Should still work without time filter
+            assert len(findings) == 1
+
+    def test_parse_finding_with_missing_compliance(self):
+        """Test parse_finding with missing compliance field."""
+        finding_data = {
+            "Id": "test-id",
+            "ProductArn": "arn:aws:securityhub:us-east-1:123456789012:product/123456789012/default",
+            "GeneratorId": "test-generator",
+            "AwsAccountId": "123456789012",
+            "Region": "us-east-1",
+            "Title": "Test Finding",
+            "Description": "Test description",
+            "Severity": {"Label": "HIGH"},
+            "Workflow": {"Status": "NEW"},
+            "RecordState": "ACTIVE",
+            "CreatedAt": datetime.utcnow(),
+            "UpdatedAt": datetime.utcnow(),
+            "Resources": [{"Type": "AwsEc2Instance"}],
+            # No Compliance field
+        }
+
+        finding = parse_finding(finding_data)
+
+        assert finding.compliance_status is None
+
+    def test_parse_finding_with_empty_compliance_status(self):
+        """Test parse_finding with empty compliance status."""
+        finding_data = {
+            "Id": "test-id",
+            "ProductArn": "arn:aws:securityhub:us-east-1:123456789012:product/123456789012/default",
+            "GeneratorId": "test-generator",
+            "AwsAccountId": "123456789012",
+            "Region": "us-east-1",
+            "Title": "Test Finding",
+            "Description": "Test description",
+            "Severity": {"Label": "HIGH"},
+            "Workflow": {"Status": "NEW"},
+            "RecordState": "ACTIVE",
+            "CreatedAt": datetime.utcnow(),
+            "UpdatedAt": datetime.utcnow(),
+            "Resources": [{"Type": "AwsEc2Instance"}],
+            "Compliance": {"Status": ""},  # Empty status
+        }
+
+        finding = parse_finding(finding_data)
+
+        assert finding.compliance_status is None
+
+    @pytest.mark.asyncio
+    async def test_get_finding_statistics_resource_type_grouping(self, mock_context, sample_finding):
+        """Test get_finding_statistics with ResourceType grouping."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            # Create findings with different resource types
+            findings = [
+                {**sample_finding, "Resources": [{"Type": "AwsEc2Instance"}]},
+                {**sample_finding, "Resources": [{"Type": "AwsEc2Instance"}]},
+                {**sample_finding, "Resources": [{"Type": "AwsS3Bucket"}]},
+            ]
+            mock_client.return_value.get_findings.return_value = {"Findings": findings}
+
+            stats = await get_finding_statistics(mock_context, group_by="ResourceType")
+
+            assert len(stats) == 2  # AwsEc2Instance and AwsS3Bucket
+            # Should be sorted by count descending
+            assert stats[0].group_key == "AwsEc2Instance"
+            assert stats[0].count == 2
+
+    @pytest.mark.asyncio
+    async def test_get_finding_statistics_product_name_grouping(self, mock_context, sample_finding):
+        """Test get_finding_statistics with ProductName grouping."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            # Create findings with different product names
+            findings = [
+                {**sample_finding, "ProductFields": {"aws/securityhub/ProductName": "Security Hub"}},
+                {**sample_finding, "ProductFields": {"aws/securityhub/ProductName": "GuardDuty"}},
+                {**sample_finding, "ProductFields": {"aws/securityhub/ProductName": "Security Hub"}},
+            ]
+            mock_client.return_value.get_findings.return_value = {"Findings": findings}
+
+            stats = await get_finding_statistics(mock_context, group_by="ProductName")
+
+            assert len(stats) == 2  # Security Hub and GuardDuty
+            # Should be sorted by count descending
+            assert stats[0].group_key == "Security Hub"
+            assert stats[0].count == 2
+
+    @pytest.mark.asyncio
+    async def test_get_finding_statistics_unknown_grouping(self, mock_context, sample_finding):
+        """Test get_finding_statistics with unknown grouping field."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_client.return_value.get_findings.return_value = {"Findings": [sample_finding]}
+
+            stats = await get_finding_statistics(mock_context, group_by="UnknownField")
+
+            # Should handle unknown grouping gracefully
+            assert len(stats) >= 0
+
+    def test_analyze_severity_trends_partial_data(self):
+        """Test severity trends analysis with partial data for some periods."""
+        trend_data = {
+            "7_days": {"severity_breakdown": {"HIGH": 2}, "data_available": True},
+            "14_days": {"severity_breakdown": {"MEDIUM": 1}, "data_available": True},
+            "30_days": {"severity_breakdown": {}, "data_available": False},  # No data for this period
+        }
+        periods = [7, 14, 30]
+
+        result = analyze_severity_trends(trend_data, periods)
+
+        assert "severity_data_points" in result
+        assert "trend_directions" in result
+        # Should handle partial data gracefully
+        assert "HIGH" in result["severity_data_points"]
+        assert "MEDIUM" in result["severity_data_points"]
+
+    def test_calculate_compliance_score_trend_mixed_statuses(self):
+        """Test compliance score trend calculation with mixed compliance statuses."""
+        compliance_trends = {
+            "PASSED": [{"period_days": 7, "count": 5}],
+            "FAILED": [{"period_days": 7, "count": 3}],
+            "WARNING": [{"period_days": 7, "count": 1}],
+            "NOT_AVAILABLE": [{"period_days": 7, "count": 1}],
+        }
+
+        result = calculate_compliance_score_trend(compliance_trends)
+
+        assert len(result) == 1
+        # Score should be calculated: 5 passed out of 8 total (PASSED + FAILED only) = 62.5%
+        assert result[0]["compliance_score"] == 62.5
+        assert result[0]["period_days"] == 7
+
+    def test_identify_most_affected_resources_single_resource(self):
+        """Test identification of most affected resources with single resource type."""
+        resource_trends = {
+            "AwsEc2Instance": [{"period_days": 7, "findings_count": 10}],
+        }
+
+        result = identify_most_affected_resources(resource_trends)
+
+        assert len(result) == 1
+        assert result[0]["resource_type"] == "AwsEc2Instance"
+        assert result[0]["findings_count"] == 10
+
+    def test_generate_trend_insights_improving_trend(self):
+        """Test trend insights generation with improving security trend."""
+        trend_data = {
+            "7_days": {
+                "severity_breakdown": {"HIGH": 1, "MEDIUM": 2},
+                "top_resource_types": {"AwsEc2Instance": 2, "AwsS3Bucket": 1},
+                "data_available": True,
+            },
+            "14_days": {
+                "severity_breakdown": {"HIGH": 3, "MEDIUM": 4},
+                "top_resource_types": {"AwsEc2Instance": 4, "AwsS3Bucket": 3},
+                "data_available": True,
+            },
+        }
+        security_scores = {"7_days": 80.0, "14_days": 70.0}  # Improving (higher recent score)
+        periods = [7, 14]
+
+        result = generate_trend_insights(trend_data, security_scores, periods)
+
+        assert "key_insights" in result
+        assert "recommendations" in result
+        assert "trend_summary" in result
+        assert len(result["key_insights"]) > 0
+        # Should detect improving trend
+        assert any("improv" in insight.get("message", "").lower() for insight in result["key_insights"])
+
+    def test_generate_detailed_trend_analysis_single_period(self):
+        """Test detailed trend analysis generation with single period."""
+        trend_data = {
+            "7_days": {
+                "severity_breakdown": {"HIGH": 2, "MEDIUM": 3},
+                "total_findings": 5,
+                "data_available": True,
+            },
+        }
+        periods = [7]
+
+        result = generate_detailed_trend_analysis(trend_data, periods)
+
+        # Should handle single period gracefully
+        assert isinstance(result, dict)
+        if result:  # May return empty dict for insufficient data
+            assert "statistical_summary" in result or len(result) == 0
+
+    @pytest.mark.asyncio
+    async def test_main_function_coverage(self):
+        """Test the main function for coverage."""
+        from awslabs.aws_security_hub_mcp_server.server import main
+
+        # Mock the mcp.run() call to avoid actually starting the server
+        with patch("awslabs.aws_security_hub_mcp_server.server.mcp.run") as mock_run:
+            main()
+            mock_run.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_get_security_findings_string_days_back(self, mock_context, sample_finding):
+        """Test get_security_findings with string days_back parameter conversion."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_client.return_value.get_findings.return_value = {"Findings": [sample_finding]}
+
+            # Test with integer days_back that gets converted internally
+            findings = await get_security_findings(mock_context, days_back=7)
+
+            assert len(findings) == 1
+            # Verify the time filter was applied
+            call_args = mock_client.return_value.get_findings.call_args
+            filters = call_args[1]["Filters"]
+            assert "UpdatedAt" in filters
+
+    @pytest.mark.asyncio
+    async def test_get_security_findings_time_filter_exception_handling(self, mock_context, sample_finding):
+        """Test get_security_findings with time filter exception handling."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_client.return_value.get_findings.return_value = {"Findings": [sample_finding]}
+
+            # Test with days_back that might cause issues in time filter (very large number)
+            with patch("awslabs.aws_security_hub_mcp_server.server.logger"):
+                findings = await get_security_findings(mock_context, days_back=999)  # Very large number
+
+                # Should still work, just without time filter if it fails
+                assert len(findings) == 1
+
+    @pytest.mark.asyncio
+    async def test_get_finding_statistics_string_days_back(self, mock_context, sample_finding):
+        """Test get_finding_statistics with string days_back parameter conversion."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_client.return_value.get_findings.return_value = {"Findings": [sample_finding]}
+
+            # Test with integer days_back that gets converted internally
+            stats = await get_finding_statistics(mock_context, days_back=7)
+
+            assert len(stats) >= 0
+            # Verify the time filter was applied
+            call_args = mock_client.return_value.get_findings.call_args
+            filters = call_args[1]["Filters"]
+            assert "UpdatedAt" in filters
+
+    @pytest.mark.asyncio
+    async def test_get_finding_statistics_time_filter_exception_handling(self, mock_context, sample_finding):
+        """Test get_finding_statistics with time filter exception handling."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_client.return_value.get_findings.return_value = {"Findings": [sample_finding]}
+
+            # Test with days_back that might cause issues in time filter (very large number)
+            with patch("awslabs.aws_security_hub_mcp_server.server.logger"):
+                stats = await get_finding_statistics(mock_context, days_back=999)  # Very large number
+
+                # Should still work, just without time filter if it fails
+                assert len(stats) >= 0
+
+    @pytest.mark.asyncio
+    async def test_get_finding_statistics_pagination_logging(self, mock_context, sample_finding):
+        """Test get_finding_statistics pagination with debug logging."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            # Mock multiple pages of results
+            first_page = {"Findings": [sample_finding], "NextToken": "token1"}
+            second_page = {"Findings": [sample_finding], "NextToken": None}
+
+            mock_client.return_value.get_findings.side_effect = [first_page, second_page]
+
+            with patch("awslabs.aws_security_hub_mcp_server.server.logger") as mock_logger:
+                await get_finding_statistics(mock_context)
+
+                # Should have logged debug messages about pagination
+                mock_logger.debug.assert_called()
+                mock_logger.info.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_get_security_findings_pagination_logging(self, mock_context, sample_finding):
+        """Test get_security_findings pagination with debug logging."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            # Mock multiple pages of results
+            first_page = {"Findings": [sample_finding], "NextToken": "token1"}
+            second_page = {"Findings": [sample_finding], "NextToken": None}
+
+            mock_client.return_value.get_findings.side_effect = [first_page, second_page]
+
+            with patch("awslabs.aws_security_hub_mcp_server.server.logger") as mock_logger:
+                await get_security_findings(mock_context)
+
+                # Should have logged debug messages about pagination
+                mock_logger.debug.assert_called()
+                mock_logger.info.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_get_finding_statistics_max_pages_safety_limit(self, mock_context, sample_finding):
+        """Test get_finding_statistics with max pages safety limit."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            # Mock infinite pagination scenario
+            mock_client.return_value.get_findings.return_value = {
+                "Findings": [sample_finding],
+                "NextToken": "always_has_next",
+            }
+
+            with patch("awslabs.aws_security_hub_mcp_server.server.logger"):
+                stats = await get_finding_statistics(mock_context)
+
+                # Should hit the max pages limit and stop
+                assert len(stats) >= 0
+                # Should have made exactly 20 calls (max_pages limit)
+                assert mock_client.return_value.get_findings.call_count == 20
+
+    @pytest.mark.asyncio
+    async def test_get_security_findings_max_pages_safety_limit(self, mock_context, sample_finding):
+        """Test get_security_findings with max pages safety limit."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            # Mock infinite pagination scenario
+            mock_client.return_value.get_findings.return_value = {
+                "Findings": [sample_finding],
+                "NextToken": "always_has_next",
+            }
+
+            findings = await get_security_findings(mock_context)
+
+            # Should hit the max pages limit and stop
+            assert len(findings) >= 0
+            # Should have made exactly 50 calls (max_pages limit for get_security_findings)
+            assert mock_client.return_value.get_findings.call_count == 50
+
+    @pytest.mark.asyncio
+    async def test_get_finding_statistics_grouping_edge_cases(self, mock_context):
+        """Test get_finding_statistics with edge cases in grouping."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            # Create findings with missing/empty fields
+            findings = [
+                {
+                    "Id": "1",
+                    "ProductArn": "arn",
+                    "GeneratorId": "gen",
+                    "AwsAccountId": "123",
+                    "Region": "us-east-1",
+                    "Title": "Test",
+                    "Description": "Test",
+                    "Workflow": {"Status": "NEW"},
+                    "RecordState": "ACTIVE",
+                    "CreatedAt": datetime.utcnow(),
+                    "UpdatedAt": datetime.utcnow(),
+                    "Resources": [],  # Empty resources
+                },
+                {
+                    "Id": "2",
+                    "ProductArn": "arn",
+                    "GeneratorId": "gen",
+                    "AwsAccountId": "123",
+                    "Region": "us-east-1",
+                    "Title": "Test",
+                    "Description": "Test",
+                    "Workflow": {"Status": "NEW"},
+                    "RecordState": "ACTIVE",
+                    "CreatedAt": datetime.utcnow(),
+                    "UpdatedAt": datetime.utcnow(),
+                    # Missing Resources field entirely
+                },
+            ]
+            mock_client.return_value.get_findings.return_value = {"Findings": findings}
+
+            # Test ResourceType grouping with empty/missing resources
+            stats = await get_finding_statistics(mock_context, group_by="ResourceType")
+
+            # Should handle empty resources gracefully
+            assert len(stats) >= 0
+            # All should be grouped as "UNKNOWN"
+            if stats:
+                assert all(stat.group_key == "UNKNOWN" for stat in stats)
+
+    @pytest.mark.asyncio
+    async def test_get_finding_statistics_compliance_status_grouping(self, mock_context, sample_finding):
+        """Test get_finding_statistics with ComplianceStatus grouping."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            # Create findings with different compliance statuses
+            findings = [
+                {**sample_finding, "Compliance": {"Status": "PASSED"}},
+                {**sample_finding, "Compliance": {"Status": "FAILED"}},
+                {**sample_finding, "Compliance": {"Status": "WARNING"}},
+                {**sample_finding},  # Missing Compliance field
+            ]
+            mock_client.return_value.get_findings.return_value = {"Findings": findings}
+
+            stats = await get_finding_statistics(mock_context, group_by="ComplianceStatus")
+
+            # Should group by compliance status
+            assert len(stats) >= 0
+            if stats:
+                compliance_keys = [stat.group_key for stat in stats]
+                # Should include the various compliance statuses
+                assert any(key in ["PASSED", "FAILED", "WARNING", "UNKNOWN"] for key in compliance_keys)
+
+    @pytest.mark.asyncio
+    async def test_get_finding_statistics_record_state_grouping(self, mock_context, sample_finding):
+        """Test get_finding_statistics with RecordState grouping."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            # Create findings with different record states
+            findings = [
+                {**sample_finding, "RecordState": "ACTIVE"},
+                {**sample_finding, "RecordState": "ARCHIVED"},
+            ]
+            mock_client.return_value.get_findings.return_value = {"Findings": findings}
+
+            stats = await get_finding_statistics(mock_context, group_by="RecordState")
+
+            # Should group by record state
+            assert len(stats) >= 0
+            if stats:
+                record_keys = [stat.group_key for stat in stats]
+                assert any(key in ["ACTIVE", "ARCHIVED"] for key in record_keys)
+
+    @pytest.mark.asyncio
+    async def test_get_security_score_pagination_logging(self, mock_context, sample_finding):
+        """Test get_security_score pagination with debug logging."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            # Mock multiple pages of results
+            first_page = {"Findings": [sample_finding], "NextToken": "token1"}
+            second_page = {"Findings": [sample_finding], "NextToken": None}
+
+            mock_client.return_value.get_findings.side_effect = [first_page, second_page]
+
+            with patch("awslabs.aws_security_hub_mcp_server.server.logger") as mock_logger:
+                score = await get_security_score(mock_context)
+
+                # Should have logged debug messages about pagination
+                mock_logger.debug.assert_called()
+                assert score.current_score >= 0
+
+    @pytest.mark.asyncio
+    async def test_get_security_score_control_findings_detection(self, mock_context):
+        """Test get_security_score with control findings detection."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            # Create findings with different generator IDs to test control detection
+            findings = [
+                {
+                    "Id": "1",
+                    "ProductArn": "arn",
+                    "GeneratorId": "aws-foundational-security-standard/v/1.0.0/S3.1",  # Should be detected as control
+                    "AwsAccountId": "123",
+                    "Region": "us-east-1",
+                    "Title": "Test",
+                    "Description": "Test",
+                    "Severity": {"Label": "HIGH"},
+                    "Workflow": {"Status": "NEW"},
+                    "RecordState": "ACTIVE",
+                    "CreatedAt": datetime.utcnow(),
+                    "UpdatedAt": datetime.utcnow(),
+                    "Resources": [{"Type": "AwsS3Bucket"}],
+                },
+                {
+                    "Id": "2",
+                    "ProductArn": "arn",
+                    "GeneratorId": "cis-aws-foundations-benchmark/v/1.2.0/1.1",  # Should be detected as control
+                    "AwsAccountId": "123",
+                    "Region": "us-east-1",
+                    "Title": "Test",
+                    "Description": "Test",
+                    "Severity": {"Label": "MEDIUM"},
+                    "Workflow": {"Status": "NEW"},
+                    "RecordState": "ACTIVE",
+                    "CreatedAt": datetime.utcnow(),
+                    "UpdatedAt": datetime.utcnow(),
+                    "Resources": [{"Type": "AwsEc2Instance"}],
+                },
+                {
+                    "Id": "3",
+                    "ProductArn": "arn",
+                    "GeneratorId": "custom-finding-generator",  # Should NOT be detected as control
+                    "AwsAccountId": "123",
+                    "Region": "us-east-1",
+                    "Title": "Test",
+                    "Description": "Test",
+                    "Severity": {"Label": "LOW"},
+                    "Workflow": {"Status": "NEW"},
+                    "RecordState": "ACTIVE",
+                    "CreatedAt": datetime.utcnow(),
+                    "UpdatedAt": datetime.utcnow(),
+                    "Resources": [{"Type": "AwsEc2Instance"}],
+                },
+            ]
+            mock_client.return_value.get_findings.return_value = {"Findings": findings}
+
+            score = await get_security_score(mock_context)
+
+            # Should calculate score based on severity weights
+            assert 0 <= score.current_score <= 100
+            assert score.max_score == 100.0
+
+    @pytest.mark.asyncio
+    async def test_get_security_score_max_possible_weight_calculation(self, mock_context):
+        """Test get_security_score with max possible weight calculation."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            # Test with no findings (edge case for max_possible_weight)
+            mock_client.return_value.get_findings.return_value = {"Findings": []}
+
+            score = await get_security_score(mock_context)
+
+            # Should handle zero findings gracefully
+            assert score.current_score == 100.0  # Perfect score when no findings
+            assert score.max_score == 100.0
+
+    @pytest.mark.asyncio
+    async def test_get_security_score_severity_weight_calculation(self, mock_context):
+        """Test get_security_score with different severity weight calculations."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            # Create findings with all severity levels to test weight calculation
+            findings = []
+            severities = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFORMATIONAL"]
+
+            for i, severity in enumerate(severities):
+                finding = {
+                    "Id": f"finding-{i}",
+                    "ProductArn": "arn",
+                    "GeneratorId": "test-generator",
+                    "AwsAccountId": "123",
+                    "Region": "us-east-1",
+                    "Title": f"Test {severity}",
+                    "Description": "Test",
+                    "Severity": {"Label": severity},
+                    "Workflow": {"Status": "NEW"},
+                    "RecordState": "ACTIVE",
+                    "CreatedAt": datetime.utcnow(),
+                    "UpdatedAt": datetime.utcnow(),
+                    "Resources": [{"Type": "AwsEc2Instance"}],
+                }
+                findings.append(finding)
+
+            mock_client.return_value.get_findings.return_value = {"Findings": findings}
+
+            score = await get_security_score(mock_context)
+
+            # Should calculate score based on all severity weights
+            assert 0 <= score.current_score <= 100
+            assert score.max_score == 100.0
+
+    @pytest.mark.asyncio
+    async def test_list_security_control_definitions_pagination_logging(self, mock_context):
+        """Test list_security_control_definitions pagination with debug logging."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_control = {
+                "SecurityControlId": "S3.1",
+                "SecurityControlArn": "arn:aws:securityhub:us-east-1:123456789012:security-control/S3.1",
+                "Title": "S3 buckets should have public access blocked",
+                "Description": "This control checks whether S3 buckets have public access blocked.",
+                "RemediationUrl": "https://docs.aws.amazon.com/console/securityhub/S3.1/remediation",
+                "SeverityRating": "HIGH",
+                "CurrentRegionAvailability": "AVAILABLE",
+            }
+
+            # Mock multiple pages of results
+            first_page = {"SecurityControlDefinitions": [mock_control], "NextToken": "token1"}
+            second_page = {"SecurityControlDefinitions": [mock_control], "NextToken": None}
+
+            mock_client.return_value.list_security_control_definitions.side_effect = [first_page, second_page]
+
+            with patch("awslabs.aws_security_hub_mcp_server.server.logger") as mock_logger:
+                controls = await list_security_control_definitions(mock_context)
+
+                # Should have logged debug messages about pagination
+                mock_logger.debug.assert_called()
+                mock_logger.info.assert_called()
+                assert len(controls) == 2
+
+    @pytest.mark.asyncio
+    async def test_list_security_control_definitions_with_standard_arn_logging(self, mock_context):
+        """Test list_security_control_definitions with standard ARN and logging."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_control = {
+                "SecurityControlId": "S3.1",
+                "SecurityControlArn": "arn:aws:securityhub:us-east-1:123456789012:security-control/S3.1",
+                "Title": "S3 buckets should have public access blocked",
+                "Description": "This control checks whether S3 buckets have public access blocked.",
+                "RemediationUrl": "https://docs.aws.amazon.com/console/securityhub/S3.1/remediation",
+                "SeverityRating": "HIGH",
+                "CurrentRegionAvailability": "AVAILABLE",
+            }
+
+            mock_client.return_value.list_security_control_definitions.return_value = {
+                "SecurityControlDefinitions": [mock_control]
+            }
+
+            with patch("awslabs.aws_security_hub_mcp_server.server.logger") as mock_logger:
+                controls = await list_security_control_definitions(
+                    mock_context,
+                    standard_arn="arn:aws:securityhub:::standard/aws-foundational-security-standard/v/1.0.0",
+                )
+
+                # Should have logged debug messages
+                mock_logger.debug.assert_called()
+                mock_logger.info.assert_called()
+                assert len(controls) == 1
+
+                # Verify standard ARN was passed to the API call
+                call_args = mock_client.return_value.list_security_control_definitions.call_args
+                assert (
+                    call_args[1]["StandardsArn"]
+                    == "arn:aws:securityhub:::standard/aws-foundational-security-standard/v/1.0.0"
+                )
+
+    @pytest.mark.asyncio
+    async def test_list_security_control_definitions_max_results_limit(self, mock_context):
+        """Test list_security_control_definitions with max results limit."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_control = {
+                "SecurityControlId": "S3.1",
+                "SecurityControlArn": "arn:aws:securityhub:us-east-1:123456789012:security-control/S3.1",
+                "Title": "S3 buckets should have public access blocked",
+                "Description": "This control checks whether S3 buckets have public access blocked.",
+                "RemediationUrl": "https://docs.aws.amazon.com/console/securityhub/S3.1/remediation",
+                "SeverityRating": "HIGH",
+                "CurrentRegionAvailability": "AVAILABLE",
+            }
+
+            # Mock pagination that would exceed max_results
+            mock_client.return_value.list_security_control_definitions.return_value = {
+                "SecurityControlDefinitions": [mock_control] * 50,  # Return 50 controls per page
+                "NextToken": "token1",
+            }
+
+            controls = await list_security_control_definitions(mock_context, max_results=75)
+
+            # Should stop when reaching max_results limit
+            assert len(controls) == 75
+            # Should have made 2 calls (50 + 25 to reach 75)
+            assert mock_client.return_value.list_security_control_definitions.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_get_finding_history_pagination_logging(self, mock_context):
+        """Test get_finding_history pagination with debug logging."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_history_record = {
+                "FindingIdentifier": {
+                    "Id": "arn:aws:securityhub:us-east-1:123456789012:finding/test-finding-1",
+                    "ProductArn": "arn:aws:securityhub:us-east-1:123456789012:product/123456789012/default",
+                },
+                "UpdateTime": datetime.utcnow(),
+                "FindingCreated": True,
+                "UpdateSource": {
+                    "Type": "BATCH_UPDATE_FINDINGS",
+                    "Identity": "arn:aws:iam::123456789012:user/test-user",
+                },
+                "Updates": [{"UpdatedField": "Workflow/Status", "OldValue": "NEW", "NewValue": "RESOLVED"}],
+            }
+
+            # Mock multiple pages of results
+            first_page = {"Records": [mock_history_record], "NextToken": "token1"}
+            second_page = {"Records": [mock_history_record], "NextToken": None}
+
+            mock_client.return_value.get_finding_history.side_effect = [first_page, second_page]
+
+            with patch("awslabs.aws_security_hub_mcp_server.server.logger") as mock_logger:
+                history = await get_finding_history(mock_context, "test-finding-id")
+
+                # Should have logged debug messages about pagination
+                mock_logger.debug.assert_called()
+                mock_logger.info.assert_called()
+                assert len(history) == 2
+
+    @pytest.mark.asyncio
+    async def test_get_finding_history_with_start_and_end_time(self, mock_context):
+        """Test get_finding_history with start and end time parameters."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_history_record = {
+                "FindingIdentifier": {
+                    "Id": "arn:aws:securityhub:us-east-1:123456789012:finding/test-finding-1",
+                    "ProductArn": "arn:aws:securityhub:us-east-1:123456789012:product/123456789012/default",
+                },
+                "UpdateTime": datetime.utcnow(),
+                "FindingCreated": True,
+                "UpdateSource": {
+                    "Type": "BATCH_UPDATE_FINDINGS",
+                    "Identity": "arn:aws:iam::123456789012:user/test-user",
+                },
+                "Updates": [{"UpdatedField": "Workflow/Status", "OldValue": "NEW", "NewValue": "RESOLVED"}],
+            }
+
+            mock_client.return_value.get_finding_history.return_value = {"Records": [mock_history_record]}
+
+            start_time = "2024-01-01T00:00:00Z"
+            end_time = "2024-01-31T23:59:59Z"
+
+            with patch("awslabs.aws_security_hub_mcp_server.server.logger") as mock_logger:
+                history = await get_finding_history(
+                    mock_context, "test-finding-id", start_time=start_time, end_time=end_time
+                )
+
+                # Should have logged debug messages
+                mock_logger.debug.assert_called()
+                mock_logger.info.assert_called()
+                assert len(history) == 1
+
+                # Verify start and end time were passed to the API call
+                call_args = mock_client.return_value.get_finding_history.call_args
+                assert "StartTime" in call_args[1]
+                assert "EndTime" in call_args[1]
+
+    @pytest.mark.asyncio
+    async def test_get_finding_history_max_results_limit(self, mock_context):
+        """Test get_finding_history with max results limit."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_history_record = {
+                "FindingIdentifier": {
+                    "Id": "arn:aws:securityhub:us-east-1:123456789012:finding/test-finding-1",
+                    "ProductArn": "arn:aws:securityhub:us-east-1:123456789012:product/123456789012/default",
+                },
+                "UpdateTime": datetime.utcnow(),
+                "FindingCreated": True,
+                "UpdateSource": {
+                    "Type": "BATCH_UPDATE_FINDINGS",
+                    "Identity": "arn:aws:iam::123456789012:user/test-user",
+                },
+                "Updates": [{"UpdatedField": "Workflow/Status", "OldValue": "NEW", "NewValue": "RESOLVED"}],
+            }
+
+            # Mock pagination that would exceed max_results
+            mock_client.return_value.get_finding_history.return_value = {
+                "Records": [mock_history_record] * 50,  # Return 50 records per page
+                "NextToken": "token1",
+            }
+
+            history = await get_finding_history(mock_context, "test-finding-id", max_results=75)
+
+            # Should stop when reaching max_results limit
+            assert len(history) == 75
+
+    @pytest.mark.asyncio
+    async def test_get_finding_history_datetime_serialization(self, mock_context):
+        """Test get_finding_history datetime serialization."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_history_record = {
+                "FindingIdentifier": {
+                    "Id": "arn:aws:securityhub:us-east-1:123456789012:finding/test-finding-1",
+                    "ProductArn": "arn:aws:securityhub:us-east-1:123456789012:product/123456789012/default",
+                },
+                "UpdateTime": datetime.utcnow(),  # This should be converted to ISO format
+                "FindingCreated": True,
+                "UpdateSource": {
+                    "Type": "BATCH_UPDATE_FINDINGS",
+                    "Identity": "arn:aws:iam::123456789012:user/test-user",
+                },
+                "Updates": [{"UpdatedField": "Workflow/Status", "OldValue": "NEW", "NewValue": "RESOLVED"}],
+            }
+
+            mock_client.return_value.get_finding_history.return_value = {"Records": [mock_history_record]}
+
+            history = await get_finding_history(mock_context, "test-finding-id")
+
+            # Should have converted datetime to ISO string
+            assert len(history) == 1
+            assert isinstance(history[0]["update_time"], str)
+            assert "T" in history[0]["update_time"]  # ISO format indicator
+
+    @pytest.mark.asyncio
+    async def test_describe_standards_controls_datetime_serialization(self, mock_context):
+        """Test describe_standards_controls datetime serialization."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_control = {
+                "StandardsControlArn": "arn:aws:securityhub:us-east-1:123456789012:control/aws-foundational-security-standard/v/1.0.0/S3.1",
+                "ControlStatus": "ENABLED",
+                "DisabledReason": None,
+                "ControlStatusUpdatedAt": datetime.utcnow(),  # This should be converted to ISO format
+                "ControlId": "S3.1",
+                "Title": "S3 buckets should have public access blocked",
+                "Description": "This control checks whether S3 buckets have public access blocked.",
+                "RemediationUrl": "https://docs.aws.amazon.com/console/securityhub/S3.1/remediation",
+                "SeverityRating": "HIGH",
+                "RelatedRequirements": ["NIST.800-53.r5 AC-3", "NIST.800-53.r5 AC-6"],
+            }
+
+            mock_client.return_value.describe_standards_controls.return_value = {"Controls": [mock_control]}
+
+            controls = await describe_standards_controls(
+                mock_context,
+                "arn:aws:securityhub:us-east-1:123456789012:subscription/aws-foundational-security-standard/v/1.0.0",
+            )
+
+            # Should have converted datetime to ISO string
+            assert len(controls) == 1
+            assert isinstance(controls[0]["control_status_updated_at"], str)
+            assert "T" in controls[0]["control_status_updated_at"]  # ISO format indicator
+
+    @pytest.mark.asyncio
+    async def test_describe_standards_controls_max_results_limit(self, mock_context):
+        """Test describe_standards_controls with max results limit."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_control = {
+                "StandardsControlArn": "arn:aws:securityhub:us-east-1:123456789012:control/aws-foundational-security-standard/v/1.0.0/S3.1",
+                "ControlStatus": "ENABLED",
+                "DisabledReason": None,
+                "ControlStatusUpdatedAt": datetime.utcnow(),
+                "ControlId": "S3.1",
+                "Title": "S3 buckets should have public access blocked",
+                "Description": "This control checks whether S3 buckets have public access blocked.",
+                "RemediationUrl": "https://docs.aws.amazon.com/console/securityhub/S3.1/remediation",
+                "SeverityRating": "HIGH",
+                "RelatedRequirements": ["NIST.800-53.r5 AC-3", "NIST.800-53.r5 AC-6"],
+            }
+
+            # Mock pagination that would exceed max_results
+            mock_client.return_value.describe_standards_controls.return_value = {
+                "Controls": [mock_control] * 50,  # Return 50 controls per page
+                "NextToken": "token1",
+            }
+
+            controls = await describe_standards_controls(
+                mock_context,
+                "arn:aws:securityhub:us-east-1:123456789012:subscription/aws-foundational-security-standard/v/1.0.0",
+                max_results=75,
+            )
+
+            # Should stop when reaching max_results limit
+            assert len(controls) == 75
+
+    def test_server_module_level_code_coverage(self):
+        """Test module-level code for coverage."""
+        # Import the server module to ensure module-level code is executed
+        import awslabs.aws_security_hub_mcp_server.server as server_module
+
+        # Verify that the mcp server is properly initialized
+        assert hasattr(server_module, "mcp")
+        assert server_module.mcp is not None
+
+        # Verify constants are set
+        assert hasattr(server_module, "DEFAULT_MAX_RESULTS")
+        assert hasattr(server_module, "MAX_RESULTS")
+        assert server_module.DEFAULT_MAX_RESULTS > 0

@@ -1,8 +1,26 @@
 # AWS Security Hub MCP Server
 
-Model Context Protocol (MCP) server for AWS Security Hub
+A Model Context Protocol (MCP) server for AWS Security Hub that provides comprehensive security findings analysis, compliance reporting, security posture management, and historical trend analysis with 10 specialized tools.
 
-This MCP server provides tools to interact with AWS Security Hub, enabling security findings analysis, standards management, and security posture monitoring through AI assistants. All tools use official AWS Security Hub APIs with complete data access and proper pagination.
+This MCP server enables AI assistants to interact with AWS Security Hub through official APIs, providing complete data access with proper pagination for security monitoring, compliance assessment, and trend analysis.
+
+## Available Tools
+
+The AWS Security Hub MCP server provides 10 comprehensive tools for security analysis and compliance management:
+
+### Core Data Retrieval Tools
+- **get-security-findings**: Retrieve and filter security findings from Security Hub
+- **get-finding-statistics**: Analyze security findings with aggregated statistics  
+- **get-security-score**: Calculate overall security posture score
+- **get-enabled-standards**: List currently enabled security standards
+- **list-security-control-definitions**: Browse available security controls
+- **get-finding-history**: Track changes to specific findings over time
+- **describe-standards-controls**: Get detailed control information for standards
+
+### Advanced Report Generation Tools
+- **generate-security-report**: Comprehensive security analysis with executive summary, findings breakdown, and actionable recommendations
+- **generate-compliance-report**: Standards-focused compliance analysis with control status and compliance recommendations  
+- **generate-security-trends-report**: Historical trend analysis to identify patterns and security posture changes over time
 
 ## Features
 
@@ -215,8 +233,9 @@ Generates historical trend analysis reports to identify patterns, improvements, 
 
 The server includes comprehensive tests:
 
-- **Unit tests**: Mock-based tests for all 10 tools covering success cases, error handling, and edge cases
-- **Integration tests**: MCP protocol tests for server functionality
+- **Unit tests**: Mock-based tests for all 10 tools covering success cases, error handling, and edge cases (`test_mcp_server_functions.py`)
+- **Integration tests**: MCP protocol tests for server functionality (`test_mcp_integration.py`)
+- **Fixture tests**: Tests for all mock fixtures and test utilities (`test_fixtures_and_mocks.py`)
 
 Run tests with:
 ```bash
@@ -227,8 +246,30 @@ uv run pytest
 uv run pytest --cov --cov-branch --cov-report=term-missing
 
 # Run only unit tests (recommended for development)
-uv run pytest tests/test_server.py -v
+uv run pytest tests/test_mcp_server_functions.py -v
+
+# Run MCP integration tests
+uv run pytest tests/test_mcp_integration.py -v
+
+# Run fixture and mock tests
+uv run pytest tests/test_fixtures_and_mocks.py -v
 ```
+
+### Integration Testing with Real AWS
+
+For integration testing with real AWS Security Hub data, use:
+
+```bash
+# Requires valid AWS credentials configured
+python test_integration_with_aws.py
+```
+
+**Important:** This integration test requires:
+- Valid AWS credentials (via environment variables, AWS credentials file, or IAM role)
+- Appropriate Security Hub permissions
+- Access to a real AWS account with Security Hub enabled
+
+**Security Note:** Never commit real AWS credentials to version control. Use environment variables or AWS credential files for testing.
 
 ## Security Considerations
 
