@@ -1,7 +1,10 @@
 {
   "compilerOptions": {
     "baseUrl": ".",
-    "types": ["node", "unist"]
+    "types": [
+      "node",
+      "unist"
+    ]
   },
   "exclude": [
     ".docusaurus",

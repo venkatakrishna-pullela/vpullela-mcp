@@ -8,7 +8,7 @@ This MCP server provides tools to interact with AWS Security Hub, enabling secur
 
 ### Core Data Retrieval Tools
 - **Get Security Findings**: Retrieve and filter security findings from Security Hub
-- **Get Finding Statistics**: Analyze security findings with aggregated statistics  
+- **Get Finding Statistics**: Analyze security findings with aggregated statistics
 - **Get Security Score**: Calculate overall security posture score
 - **Get Enabled Standards**: List currently enabled security standards
 - **List Security Control Definitions**: Browse available security controls
@@ -132,7 +132,7 @@ Retrieves security findings from AWS Security Hub with comprehensive filtering c
 
 **Example:** *"Show me all CRITICAL and HIGH severity findings from the last 7 days that are still NEW"*
 
-### get-finding-statistics  
+### get-finding-statistics
 Provides aggregated statistical analysis of your security findings, helping you understand trends and distributions across your security posture. You can group statistics by severity level, workflow status, product name, resource type, or compliance status. This tool is perfect for generating security dashboards and identifying patterns in your security findings over time.
 
 **Example:** *"Get security finding statistics grouped by severity for the last 30 days to see our security trend"*
@@ -274,7 +274,7 @@ Before using this server in production environments, conduct your own independen
 ### Common Issues
 
 1. **AccessDenied errors**: Ensure your AWS credentials have the required Security Hub permissions
-2. **Security Hub not enabled**: Enable Security Hub in your AWS account and region  
+2. **Security Hub not enabled**: Enable Security Hub in your AWS account and region
 3. **No findings returned**: Check if Security Hub has findings in the specified region and time range
 4. **Rate limiting**: The server implements appropriate rate limiting and pagination for AWS API calls
 5. **Finding history not available**: Some findings may not have history records if they haven't been updated
