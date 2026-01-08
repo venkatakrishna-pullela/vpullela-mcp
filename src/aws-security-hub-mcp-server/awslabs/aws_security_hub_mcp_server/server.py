@@ -148,6 +148,29 @@ def parse_finding(finding_data: dict[str, Any]) -> SecurityFinding:
     remediation = finding_data.get("Remediation", {})
     remediation_url = remediation.get("Recommendation", {}).get("Url") if remediation else None
 
+    # Handle invalid enum values gracefully
+    try:
+        severity_enum = SeverityLabel(severity_label)
+    except ValueError:
+        severity_enum = SeverityLabel.INFORMATIONAL
+    
+    try:
+        workflow_enum = WorkflowStatus(workflow_status)
+    except ValueError:
+        workflow_enum = WorkflowStatus.NEW
+    
+    try:
+        record_state_enum = RecordState(finding_data.get("RecordState", "ACTIVE"))
+    except ValueError:
+        record_state_enum = RecordState.ACTIVE
+    
+    compliance_enum = None
+    if compliance_status:
+        try:
+            compliance_enum = ComplianceStatus(compliance_status)
+        except ValueError:
+            compliance_enum = None
+
     return SecurityFinding(
         id=finding_data["Id"],
         product_arn=finding_data["ProductArn"],
@@ -156,11 +179,11 @@ def parse_finding(finding_data: dict[str, Any]) -> SecurityFinding:
         region=finding_data["Region"],
         title=finding_data["Title"],
         description=finding_data["Description"],
-        severity_label=SeverityLabel(severity_label),
+        severity_label=severity_enum,
         severity_score=severity_score,
-        workflow_status=WorkflowStatus(workflow_status),
-        record_state=RecordState(finding_data.get("RecordState", "ACTIVE")),
-        compliance_status=ComplianceStatus(compliance_status) if compliance_status else None,
+        workflow_status=workflow_enum,
+        record_state=record_state_enum,
+        compliance_status=compliance_enum,
         created_at=finding_data["CreatedAt"],
         updated_at=finding_data["UpdatedAt"],
         resource_type=resource_type,

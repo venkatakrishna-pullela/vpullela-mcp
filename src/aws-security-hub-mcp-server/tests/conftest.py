@@ -68,3 +68,51 @@ def sample_standard():
 def mock_context():
     """Mock MCP context for testing."""
     return Mock()
+
+@pytest.fixture
+def sample_enabled_standard():
+    """Sample enabled Security Hub standard for testing."""
+    return {
+        "StandardsSubscriptionArn": "arn:aws:securityhub:us-east-1:123456789012:subscription/aws-foundational-security-standard/v/1.0.0",
+        "StandardsArn": "arn:aws:securityhub:::standard/aws-foundational-security-standard/v/1.0.0",
+        "StandardsInput": {},
+        "StandardsStatus": "READY"
+    }
+
+
+@pytest.fixture
+def sample_control_definition():
+    """Sample security control definition for testing."""
+    return {
+        "SecurityControlId": "S3.1",
+        "SecurityControlArn": "arn:aws:securityhub:us-east-1:123456789012:security-control/S3.1",
+        "Title": "S3 buckets should have public access blocked",
+        "Description": "This control checks whether S3 buckets have public access blocked.",
+        "RemediationUrl": "https://docs.aws.amazon.com/console/securityhub/S3.1/remediation",
+        "SeverityRating": "HIGH",
+        "CurrentRegionAvailability": "AVAILABLE"
+    }
+
+
+@pytest.fixture
+def sample_finding_history():
+    """Sample finding history record for testing."""
+    return {
+        "FindingIdentifier": {
+            "Id": "arn:aws:securityhub:us-east-1:123456789012:finding/test-finding-1",
+            "ProductArn": "arn:aws:securityhub:us-east-1:123456789012:product/123456789012/default"
+        },
+        "UpdateTime": datetime.utcnow(),
+        "FindingCreated": True,
+        "UpdateSource": {
+            "Type": "BATCH_UPDATE_FINDINGS",
+            "Identity": "arn:aws:iam::123456789012:user/test-user"
+        },
+        "Updates": [
+            {
+                "UpdatedField": "Workflow/Status",
+                "OldValue": "NEW",
+                "NewValue": "RESOLVED"
+            }
+        ]
+    }
