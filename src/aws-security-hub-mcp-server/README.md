@@ -10,7 +10,7 @@ The AWS Security Hub MCP server provides 10 comprehensive tools for security ana
 
 ### Core Data Retrieval Tools
 - **get-security-findings**: Retrieve and filter security findings from Security Hub
-- **get-finding-statistics**: Analyze security findings with aggregated statistics  
+- **get-finding-statistics**: Analyze security findings with aggregated statistics
 - **get-security-score**: Calculate overall security posture score
 - **get-enabled-standards**: List currently enabled security standards
 - **list-security-control-definitions**: Browse available security controls
@@ -19,7 +19,7 @@ The AWS Security Hub MCP server provides 10 comprehensive tools for security ana
 
 ### Advanced Report Generation Tools
 - **generate-security-report**: Comprehensive security analysis with executive summary, findings breakdown, and actionable recommendations
-- **generate-compliance-report**: Standards-focused compliance analysis with control status and compliance recommendations  
+- **generate-compliance-report**: Standards-focused compliance analysis with control status and compliance recommendations
 - **generate-security-trends-report**: Historical trend analysis to identify patterns and security posture changes over time
 
 ## Features

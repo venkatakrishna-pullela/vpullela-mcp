@@ -9,6 +9,7 @@ dependencies = [
     "mcp[cli]>=1.23.0",
     "pydantic>=2.10.6",
     "loguru>=0.7.0",
+    "urllib3>=2.6.3",
 ]
 license = {text = "Apache-2.0"}
 license-files = ["LICENSE", "NOTICE" ]
