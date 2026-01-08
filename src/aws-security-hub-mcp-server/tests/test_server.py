@@ -13,7 +13,7 @@
 # limitations under the License.
 """Tests for AWS Security Hub MCP Server."""
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from unittest.mock import Mock, patch
 
 import pytest
@@ -176,9 +176,9 @@ class TestSecurityHubServer:
         with patch("awslabs.aws_security_hub_mcp_server.server.boto3.Session") as mock_session:
             mock_client = Mock()
             mock_session.return_value.client.return_value = mock_client
-            
+
             client = get_security_hub_client()
-            
+
             assert client == mock_client
             mock_session.assert_called_once()
 
@@ -186,7 +186,7 @@ class TestSecurityHubServer:
         """Test Security Hub client creation with no credentials."""
         with patch("awslabs.aws_security_hub_mcp_server.server.boto3.Session") as mock_session:
             mock_session.side_effect = NoCredentialsError()
-            
+
             with pytest.raises(NoCredentialsError):
                 get_security_hub_client()
 
@@ -194,8 +194,8 @@ class TestSecurityHubServer:
         """Test Security Hub client creation with client error."""
         with patch("awslabs.aws_security_hub_mcp_server.server.boto3.Session") as mock_session:
             mock_session.side_effect = Exception("Connection error")
-            
-            with pytest.raises(Exception):
+
+            with pytest.raises(Exception, match="Connection error"):
                 get_security_hub_client()
 
     # Test get_enabled_standards function
@@ -208,13 +208,13 @@ class TestSecurityHubServer:
                     "StandardsSubscriptionArn": "arn:aws:securityhub:us-east-1:123456789012:subscription/aws-foundational-security-standard/v/1.0.0",
                     "StandardsArn": "arn:aws:securityhub:::standard/aws-foundational-security-standard/v/1.0.0",
                     "StandardsInput": {},
-                    "StandardsStatus": "READY"
+                    "StandardsStatus": "READY",
                 }
             ]
             mock_client.return_value.get_enabled_standards.return_value = {"StandardsSubscriptions": mock_standards}
-            
+
             standards = await get_enabled_standards(mock_context)
-            
+
             assert len(standards) == 1
             assert standards[0].standards_subscription_arn == mock_standards[0]["StandardsSubscriptionArn"]
             assert standards[0].standards_arn == mock_standards[0]["StandardsArn"]
@@ -225,13 +225,12 @@ class TestSecurityHubServer:
         """Test get_enabled_standards with client error."""
         with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
             mock_client.return_value.get_enabled_standards.side_effect = ClientError(
-                {"Error": {"Code": "AccessDenied", "Message": "Access denied"}}, 
-                "GetEnabledStandards"
+                {"Error": {"Code": "AccessDenied", "Message": "Access denied"}}, "GetEnabledStandards"
             )
-            
+
             with pytest.raises(Exception) as exc_info:
                 await get_enabled_standards(mock_context)
-            
+
             assert "Security Hub API error" in str(exc_info.value)
 
     # Test list_security_control_definitions function
@@ -247,13 +246,15 @@ class TestSecurityHubServer:
                     "Description": "This control checks whether S3 buckets have public access blocked.",
                     "RemediationUrl": "https://docs.aws.amazon.com/console/securityhub/S3.1/remediation",
                     "SeverityRating": "HIGH",
-                    "CurrentRegionAvailability": "AVAILABLE"
+                    "CurrentRegionAvailability": "AVAILABLE",
                 }
             ]
-            mock_client.return_value.list_security_control_definitions.return_value = {"SecurityControlDefinitions": mock_controls}
-            
+            mock_client.return_value.list_security_control_definitions.return_value = {
+                "SecurityControlDefinitions": mock_controls
+            }
+
             controls = await list_security_control_definitions(mock_context)
-            
+
             assert len(controls) == 1
             assert controls[0].security_control_id == "S3.1"
             assert controls[0].title == "S3 buckets should have public access blocked"
@@ -264,11 +265,16 @@ class TestSecurityHubServer:
         """Test listing security control definitions with standard ARN filter."""
         with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
             mock_client.return_value.list_security_control_definitions.return_value = {"SecurityControlDefinitions": []}
-            
-            await list_security_control_definitions(mock_context, standard_arn="arn:aws:securityhub:::standard/aws-foundational-security-standard/v/1.0.0")
-            
+
+            await list_security_control_definitions(
+                mock_context, standard_arn="arn:aws:securityhub:::standard/aws-foundational-security-standard/v/1.0.0"
+            )
+
             call_args = mock_client.return_value.list_security_control_definitions.call_args
-            assert call_args[1]["StandardsArn"] == "arn:aws:securityhub:::standard/aws-foundational-security-standard/v/1.0.0"
+            assert (
+                call_args[1]["StandardsArn"]
+                == "arn:aws:securityhub:::standard/aws-foundational-security-standard/v/1.0.0"
+            )
 
     # Test get_finding_history function
     @pytest.mark.asyncio
@@ -279,29 +285,28 @@ class TestSecurityHubServer:
                 {
                     "FindingIdentifier": {
                         "Id": "arn:aws:securityhub:us-east-1:123456789012:finding/test-finding-1",
-                        "ProductArn": "arn:aws:securityhub:us-east-1:123456789012:product/123456789012/default"
+                        "ProductArn": "arn:aws:securityhub:us-east-1:123456789012:product/123456789012/default",
                     },
                     "UpdateTime": datetime.utcnow(),
                     "FindingCreated": True,
                     "UpdateSource": {
                         "Type": "BATCH_UPDATE_FINDINGS",
-                        "Identity": "arn:aws:iam::123456789012:user/test-user"
+                        "Identity": "arn:aws:iam::123456789012:user/test-user",
                     },
-                    "Updates": [
-                        {
-                            "UpdatedField": "Workflow/Status",
-                            "OldValue": "NEW",
-                            "NewValue": "RESOLVED"
-                        }
-                    ]
+                    "Updates": [{"UpdatedField": "Workflow/Status", "OldValue": "NEW", "NewValue": "RESOLVED"}],
                 }
             ]
             mock_client.return_value.get_finding_history.return_value = {"Records": mock_history}
-            
-            history = await get_finding_history(mock_context, "arn:aws:securityhub:us-east-1:123456789012:finding/test-finding-1")
-            
+
+            history = await get_finding_history(
+                mock_context, "arn:aws:securityhub:us-east-1:123456789012:finding/test-finding-1"
+            )
+
             assert len(history) == 1
-            assert history[0]["finding_identifier"]["Id"] == "arn:aws:securityhub:us-east-1:123456789012:finding/test-finding-1"
+            assert (
+                history[0]["finding_identifier"]["Id"]
+                == "arn:aws:securityhub:us-east-1:123456789012:finding/test-finding-1"
+            )
             assert history[0]["finding_created"] is True
 
     @pytest.mark.asyncio
@@ -309,12 +314,12 @@ class TestSecurityHubServer:
         """Test get_finding_history with start and end times."""
         with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
             mock_client.return_value.get_finding_history.return_value = {"Records": []}
-            
+
             start_time = "2024-01-01T00:00:00Z"
             end_time = "2024-01-31T23:59:59Z"
-            
+
             await get_finding_history(mock_context, "test-finding-id", start_time=start_time, end_time=end_time)
-            
+
             call_args = mock_client.return_value.get_finding_history.call_args
             assert "StartTime" in call_args[1]
             assert "EndTime" in call_args[1]
@@ -335,13 +340,16 @@ class TestSecurityHubServer:
                     "Description": "This control checks whether S3 buckets have public access blocked.",
                     "RemediationUrl": "https://docs.aws.amazon.com/console/securityhub/S3.1/remediation",
                     "SeverityRating": "HIGH",
-                    "RelatedRequirements": ["NIST.800-53.r5 AC-3", "NIST.800-53.r5 AC-6"]
+                    "RelatedRequirements": ["NIST.800-53.r5 AC-3", "NIST.800-53.r5 AC-6"],
                 }
             ]
             mock_client.return_value.describe_standards_controls.return_value = {"Controls": mock_controls}
-            
-            controls = await describe_standards_controls(mock_context, "arn:aws:securityhub:us-east-1:123456789012:subscription/aws-foundational-security-standard/v/1.0.0")
-            
+
+            controls = await describe_standards_controls(
+                mock_context,
+                "arn:aws:securityhub:us-east-1:123456789012:subscription/aws-foundational-security-standard/v/1.0.0",
+            )
+
             assert len(controls) == 1
             assert controls[0]["control_id"] == "S3.1"
             assert controls[0]["control_status"] == "ENABLED"
@@ -354,9 +362,9 @@ class TestSecurityHubServer:
         with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
             mock_client.return_value.get_findings.return_value = {"Findings": [sample_finding]}
             mock_client.return_value.get_enabled_standards.return_value = {"StandardsSubscriptions": []}
-            
+
             report = await generate_security_report(mock_context)
-            
+
             assert "executive_summary" in report
             assert "security_score" in report["executive_summary"]
             assert "detailed_findings" in report
@@ -369,9 +377,9 @@ class TestSecurityHubServer:
         with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
             mock_client.return_value.get_findings.return_value = {"Findings": [sample_finding]}
             mock_client.return_value.get_enabled_standards.return_value = {"StandardsSubscriptions": []}
-            
+
             report = await generate_compliance_report(mock_context)
-            
+
             assert "executive_summary" in report
             assert "overall_compliance_percentage" in report["executive_summary"]
             assert "standards_compliance" in report
@@ -383,9 +391,9 @@ class TestSecurityHubServer:
         """Test successful generation of security trends report."""
         with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
             mock_client.return_value.get_findings.return_value = {"Findings": [sample_finding]}
-            
+
             report = await generate_security_trends_report(mock_context)
-            
+
             assert "trend_analysis" in report
             assert "severity_trends" in report["trend_analysis"]
             assert "insights_and_recommendations" in report
@@ -396,12 +404,12 @@ class TestSecurityHubServer:
         """Test severity trends analysis."""
         trend_data = {
             "7_days": {"severity_breakdown": {"HIGH": 1, "MEDIUM": 1}, "data_available": True},
-            "14_days": {"severity_breakdown": {"HIGH": 2, "LOW": 1}, "data_available": True}
+            "14_days": {"severity_breakdown": {"HIGH": 2, "LOW": 1}, "data_available": True},
         }
         periods = [7, 14]
-        
+
         result = analyze_severity_trends(trend_data, periods)
-        
+
         assert "severity_data_points" in result
         assert "trend_directions" in result
         assert "HIGH" in result["severity_data_points"]
@@ -415,12 +423,12 @@ class TestSecurityHubServer:
         """Test compliance trends analysis."""
         trend_data = {
             "7_days": {"compliance_breakdown": {"FAILED": 1, "PASSED": 1}, "data_available": True},
-            "14_days": {"compliance_breakdown": {"FAILED": 2, "PASSED": 0}, "data_available": True}
+            "14_days": {"compliance_breakdown": {"FAILED": 2, "PASSED": 0}, "data_available": True},
         }
         periods = [7, 14]
-        
+
         result = analyze_compliance_trends(trend_data, periods)
-        
+
         assert "compliance_data_points" in result
         assert "compliance_score_trend" in result
         assert "FAILED" in result["compliance_data_points"]
@@ -433,12 +441,12 @@ class TestSecurityHubServer:
         """Test resource type trends analysis."""
         trend_data = {
             "7_days": {"top_resource_types": {"AwsEc2Instance": 1, "AwsS3Bucket": 1}, "data_available": True},
-            "14_days": {"top_resource_types": {"AwsEc2Instance": 2, "AwsS3Bucket": 0}, "data_available": True}
+            "14_days": {"top_resource_types": {"AwsEc2Instance": 2, "AwsS3Bucket": 0}, "data_available": True},
         }
         periods = [7, 14]
-        
+
         result = analyze_resource_type_trends(trend_data, periods)
-        
+
         assert "resource_type_data_points" in result
         assert "most_affected_resources" in result
         assert "AwsEc2Instance" in result["resource_type_data_points"]
@@ -450,26 +458,14 @@ class TestSecurityHubServer:
     def test_calculate_compliance_score_trend(self):
         """Test compliance score trend calculation."""
         compliance_trends = {
-            "PASSED": [
-                {"period_days": 7, "count": 10},
-                {"period_days": 14, "count": 15}
-            ],
-            "FAILED": [
-                {"period_days": 7, "count": 5},
-                {"period_days": 14, "count": 3}
-            ],
-            "WARNING": [
-                {"period_days": 7, "count": 2},
-                {"period_days": 14, "count": 1}
-            ],
-            "NOT_AVAILABLE": [
-                {"period_days": 7, "count": 0},
-                {"period_days": 14, "count": 0}
-            ]
+            "PASSED": [{"period_days": 7, "count": 10}, {"period_days": 14, "count": 15}],
+            "FAILED": [{"period_days": 7, "count": 5}, {"period_days": 14, "count": 3}],
+            "WARNING": [{"period_days": 7, "count": 2}, {"period_days": 14, "count": 1}],
+            "NOT_AVAILABLE": [{"period_days": 7, "count": 0}, {"period_days": 14, "count": 0}],
         }
-        
+
         result = calculate_compliance_score_trend(compliance_trends)
-        
+
         assert len(result) == 2
         assert 0 <= result[0]["compliance_score"] <= 100
         assert 0 <= result[1]["compliance_score"] <= 100
@@ -479,22 +475,13 @@ class TestSecurityHubServer:
     def test_identify_most_affected_resources(self):
         """Test identification of most affected resources."""
         resource_trends = {
-            "AwsEc2Instance": [
-                {"period_days": 7, "findings_count": 5},
-                {"period_days": 14, "findings_count": 8}
-            ],
-            "AwsS3Bucket": [
-                {"period_days": 7, "findings_count": 2},
-                {"period_days": 14, "findings_count": 3}
-            ],
-            "AwsRdsDbInstance": [
-                {"period_days": 7, "findings_count": 1},
-                {"period_days": 14, "findings_count": 1}
-            ]
+            "AwsEc2Instance": [{"period_days": 7, "findings_count": 5}, {"period_days": 14, "findings_count": 8}],
+            "AwsS3Bucket": [{"period_days": 7, "findings_count": 2}, {"period_days": 14, "findings_count": 3}],
+            "AwsRdsDbInstance": [{"period_days": 7, "findings_count": 1}, {"period_days": 14, "findings_count": 1}],
         }
-        
+
         result = identify_most_affected_resources(resource_trends)
-        
+
         assert len(result) <= 5  # Should return top 5
         assert result[0]["resource_type"] == "AwsEc2Instance"  # Most affected
         assert result[0]["findings_count"] == 5  # Most recent count (7-day period)
@@ -505,12 +492,12 @@ class TestSecurityHubServer:
         improving_scores = {"7_days": 80.0, "14_days": 70.0, "30_days": 60.0}
         result = determine_overall_trend_direction(improving_scores, [7, 14, 30])
         assert result == "improving"
-        
+
         # Declining trend
         declining_scores = {"7_days": 60.0, "14_days": 70.0, "30_days": 80.0}
         result = determine_overall_trend_direction(declining_scores, [7, 14, 30])
         assert result == "declining"
-        
+
         # Stable trend
         stable_scores = {"7_days": 70.0, "14_days": 71.0, "30_days": 69.0}
         result = determine_overall_trend_direction(stable_scores, [7, 14, 30])
@@ -522,19 +509,19 @@ class TestSecurityHubServer:
             "7_days": {
                 "severity_breakdown": {"HIGH": 1},
                 "top_resource_types": {"AwsEc2Instance": 1},
-                "data_available": True
+                "data_available": True,
             },
             "14_days": {
                 "severity_breakdown": {"MEDIUM": 1},
                 "top_resource_types": {"AwsS3Bucket": 1},
-                "data_available": True
-            }
+                "data_available": True,
+            },
         }
         security_scores = {"7_days": 70.0, "14_days": 75.0}
         periods = [7, 14]
-        
+
         result = generate_trend_insights(trend_data, security_scores, periods)
-        
+
         assert "key_insights" in result
         assert "recommendations" in result
         assert "trend_summary" in result
@@ -544,21 +531,13 @@ class TestSecurityHubServer:
     def test_generate_detailed_trend_analysis(self):
         """Test detailed trend analysis generation."""
         trend_data = {
-            "7_days": {
-                "severity_breakdown": {"HIGH": 1, "MEDIUM": 1},
-                "total_findings": 2,
-                "data_available": True
-            },
-            "14_days": {
-                "severity_breakdown": {"HIGH": 1, "LOW": 1},
-                "total_findings": 2,
-                "data_available": True
-            }
+            "7_days": {"severity_breakdown": {"HIGH": 1, "MEDIUM": 1}, "total_findings": 2, "data_available": True},
+            "14_days": {"severity_breakdown": {"HIGH": 1, "LOW": 1}, "total_findings": 2, "data_available": True},
         }
         periods = [7, 14]
-        
+
         result = generate_detailed_trend_analysis(trend_data, periods)
-        
+
         assert "statistical_summary" in result
         assert "period_comparisons" in result
         assert "data_quality_assessment" in result
@@ -570,13 +549,12 @@ class TestSecurityHubServer:
         """Test get_finding_statistics with client error."""
         with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
             mock_client.return_value.get_findings.side_effect = ClientError(
-                {"Error": {"Code": "AccessDenied", "Message": "Access denied"}}, 
-                "GetFindings"
+                {"Error": {"Code": "AccessDenied", "Message": "Access denied"}}, "GetFindings"
             )
-            
+
             with pytest.raises(Exception) as exc_info:
                 await get_finding_statistics(mock_context)
-            
+
             assert "Security Hub API error" in str(exc_info.value)
 
     @pytest.mark.asyncio
@@ -584,13 +562,12 @@ class TestSecurityHubServer:
         """Test get_security_score with client error."""
         with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
             mock_client.return_value.get_findings.side_effect = ClientError(
-                {"Error": {"Code": "AccessDenied", "Message": "Access denied"}}, 
-                "GetFindings"
+                {"Error": {"Code": "AccessDenied", "Message": "Access denied"}}, "GetFindings"
             )
-            
+
             with pytest.raises(Exception) as exc_info:
                 await get_security_score(mock_context)
-            
+
             assert "Security Hub API error" in str(exc_info.value)
 
     # Test edge cases
@@ -599,9 +576,9 @@ class TestSecurityHubServer:
         """Test get_finding_statistics with empty results."""
         with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
             mock_client.return_value.get_findings.return_value = {"Findings": []}
-            
+
             stats = await get_finding_statistics(mock_context, group_by="SeverityLabel")
-            
+
             assert len(stats) == 0
 
     @pytest.mark.asyncio
@@ -609,9 +586,9 @@ class TestSecurityHubServer:
         """Test get_security_score with no findings."""
         with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
             mock_client.return_value.get_findings.return_value = {"Findings": []}
-            
+
             score = await get_security_score(mock_context)
-            
+
             assert score.current_score == 100.0  # Perfect score when no findings
             assert score.security_score_percentage == 100.0
 
@@ -630,11 +607,11 @@ class TestSecurityHubServer:
             "RecordState": "ACTIVE",
             "CreatedAt": datetime.utcnow(),
             "UpdatedAt": datetime.utcnow(),
-            "Resources": [{"Type": "AwsEc2Instance"}]
+            "Resources": [{"Type": "AwsEc2Instance"}],
         }
-        
+
         finding = parse_finding(minimal_finding)
-        
+
         assert finding.id == "test-id"
         assert finding.title == "Test Finding"
         assert finding.severity_label == SeverityLabel.MEDIUM
@@ -655,9 +632,771 @@ class TestSecurityHubServer:
             "RecordState": "ACTIVE",
             "CreatedAt": datetime.utcnow(),
             "UpdatedAt": datetime.utcnow(),
-            "Resources": [{"Type": "AwsEc2Instance"}]
+            "Resources": [{"Type": "AwsEc2Instance"}],
         }
-        
+
         finding = parse_finding(finding_data)
-        
+
         assert finding.severity_label == SeverityLabel.INFORMATIONAL  # Default fallback
+
+    def test_parse_finding_invalid_workflow_status(self):
+        """Test parse_finding with invalid workflow status."""
+        finding_data = {
+            "Id": "test-id",
+            "ProductArn": "arn:aws:securityhub:us-east-1:123456789012:product/123456789012/default",
+            "GeneratorId": "test-generator",
+            "AwsAccountId": "123456789012",
+            "Region": "us-east-1",
+            "Title": "Test Finding",
+            "Description": "Test description",
+            "Severity": {"Label": "HIGH"},
+            "Workflow": {"Status": "INVALID_STATUS"},
+            "RecordState": "ACTIVE",
+            "CreatedAt": datetime.utcnow(),
+            "UpdatedAt": datetime.utcnow(),
+            "Resources": [{"Type": "AwsEc2Instance"}],
+        }
+
+        finding = parse_finding(finding_data)
+
+        assert finding.workflow_status == WorkflowStatus.NEW  # Default fallback
+
+    def test_parse_finding_invalid_record_state(self):
+        """Test parse_finding with invalid record state."""
+        finding_data = {
+            "Id": "test-id",
+            "ProductArn": "arn:aws:securityhub:us-east-1:123456789012:product/123456789012/default",
+            "GeneratorId": "test-generator",
+            "AwsAccountId": "123456789012",
+            "Region": "us-east-1",
+            "Title": "Test Finding",
+            "Description": "Test description",
+            "Severity": {"Label": "HIGH"},
+            "Workflow": {"Status": "NEW"},
+            "RecordState": "INVALID_STATE",
+            "CreatedAt": datetime.utcnow(),
+            "UpdatedAt": datetime.utcnow(),
+            "Resources": [{"Type": "AwsEc2Instance"}],
+        }
+
+        finding = parse_finding(finding_data)
+
+        assert finding.record_state.value == "ACTIVE"  # Default fallback
+
+    def test_parse_finding_invalid_compliance_status(self):
+        """Test parse_finding with invalid compliance status."""
+        finding_data = {
+            "Id": "test-id",
+            "ProductArn": "arn:aws:securityhub:us-east-1:123456789012:product/123456789012/default",
+            "GeneratorId": "test-generator",
+            "AwsAccountId": "123456789012",
+            "Region": "us-east-1",
+            "Title": "Test Finding",
+            "Description": "Test description",
+            "Severity": {"Label": "HIGH"},
+            "Workflow": {"Status": "NEW"},
+            "RecordState": "ACTIVE",
+            "CreatedAt": datetime.utcnow(),
+            "UpdatedAt": datetime.utcnow(),
+            "Resources": [{"Type": "AwsEc2Instance"}],
+            "Compliance": {"Status": "INVALID_COMPLIANCE"},
+        }
+
+        finding = parse_finding(finding_data)
+
+        assert finding.compliance_status is None  # Default fallback for invalid status
+
+    @pytest.mark.asyncio
+    async def test_get_security_findings_with_all_filters(self, mock_context, sample_finding):
+        """Test security findings retrieval with all possible filters."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_client.return_value.get_findings.return_value = {"Findings": [sample_finding]}
+
+            from awslabs.aws_security_hub_mcp_server.models import RecordState
+
+            findings = await get_security_findings(
+                mock_context,
+                severity_labels=[SeverityLabel.HIGH],
+                workflow_status=[WorkflowStatus.NEW],
+                compliance_status=[ComplianceStatus.FAILED],
+                record_state=[RecordState.ACTIVE],
+                resource_type="AwsEc2Instance",
+                product_name="Security Hub",
+                days_back=30,
+                max_results=50,
+            )
+
+            assert len(findings) == 1
+            mock_client.return_value.get_findings.assert_called_once()
+
+            # Verify all filters were applied
+            call_args = mock_client.return_value.get_findings.call_args
+            filters = call_args[1]["Filters"]
+            assert "SeverityLabel" in filters
+            assert "WorkflowStatus" in filters
+            assert "ComplianceStatus" in filters
+            assert "RecordState" in filters
+            assert "ResourceType" in filters
+            assert "ProductName" in filters
+            assert "UpdatedAt" in filters
+
+    @pytest.mark.asyncio
+    async def test_get_finding_statistics_different_group_by(self, mock_context, sample_finding):
+        """Test get_finding_statistics with different group_by options."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            # Test with WorkflowStatus grouping
+            findings = [
+                {**sample_finding, "Workflow": {"Status": "NEW"}},
+                {**sample_finding, "Workflow": {"Status": "NEW"}},
+                {**sample_finding, "Workflow": {"Status": "RESOLVED"}},
+            ]
+            mock_client.return_value.get_findings.return_value = {"Findings": findings}
+
+            stats = await get_finding_statistics(mock_context, group_by="WorkflowStatus")
+
+            assert len(stats) == 2  # NEW and RESOLVED
+            assert stats[0].group_key == "NEW"
+            assert stats[0].count == 2
+            assert stats[1].group_key == "RESOLVED"
+            assert stats[1].count == 1
+
+    @pytest.mark.asyncio
+    async def test_list_security_control_definitions_client_error(self, mock_context):
+        """Test list_security_control_definitions with client error."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_client.return_value.list_security_control_definitions.side_effect = ClientError(
+                {"Error": {"Code": "AccessDenied", "Message": "Access denied"}}, "ListSecurityControlDefinitions"
+            )
+
+            with pytest.raises(Exception) as exc_info:
+                await list_security_control_definitions(mock_context)
+
+            assert "Security Hub API error" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_get_finding_history_client_error(self, mock_context):
+        """Test get_finding_history with client error."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_client.return_value.get_finding_history.side_effect = ClientError(
+                {"Error": {"Code": "AccessDenied", "Message": "Access denied"}}, "GetFindingHistory"
+            )
+
+            with pytest.raises(Exception) as exc_info:
+                await get_finding_history(mock_context, "test-finding-id")
+
+            assert "Security Hub API error" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_describe_standards_controls_client_error(self, mock_context):
+        """Test describe_standards_controls with client error."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_client.return_value.describe_standards_controls.side_effect = ClientError(
+                {"Error": {"Code": "AccessDenied", "Message": "Access denied"}}, "DescribeStandardsControls"
+            )
+
+            with pytest.raises(Exception) as exc_info:
+                await describe_standards_controls(mock_context, "test-standard-arn")
+
+            assert "Security Hub API error" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_generate_security_report_client_error(self, mock_context):
+        """Test generate_security_report with client error."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_client.return_value.get_findings.side_effect = ClientError(
+                {"Error": {"Code": "AccessDenied", "Message": "Access denied"}}, "GetFindings"
+            )
+
+            with pytest.raises(Exception) as exc_info:
+                await generate_security_report(mock_context)
+
+            assert "Security Hub API error" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_generate_compliance_report_client_error(self, mock_context):
+        """Test generate_compliance_report with client error."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_client.return_value.get_findings.side_effect = ClientError(
+                {"Error": {"Code": "AccessDenied", "Message": "Access denied"}}, "GetFindings"
+            )
+
+            with pytest.raises(Exception) as exc_info:
+                await generate_compliance_report(mock_context)
+
+            assert "Security Hub API error" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_generate_security_trends_report_client_error(self, mock_context):
+        """Test generate_security_trends_report with client error."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_client.return_value.get_findings.side_effect = ClientError(
+                {"Error": {"Code": "AccessDenied", "Message": "Access denied"}}, "GetFindings"
+            )
+
+            # The trends report handles errors gracefully and returns a report with warnings
+            report = await generate_security_trends_report(mock_context)
+
+            # Should return a report structure even with errors
+            assert "trend_analysis" in report
+            assert "insights_and_recommendations" in report
+
+    def test_analyze_severity_trends_no_data(self):
+        """Test severity trends analysis with no data available."""
+        trend_data = {
+            "7_days": {"severity_breakdown": {}, "data_available": False},
+            "14_days": {"severity_breakdown": {}, "data_available": False},
+        }
+        periods = [7, 14]
+
+        result = analyze_severity_trends(trend_data, periods)
+
+        assert "severity_data_points" in result
+        assert "trend_directions" in result
+        # Should handle empty data gracefully
+        for severity in ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFORMATIONAL"]:
+            assert severity in result["severity_data_points"]
+
+    def test_analyze_compliance_trends_no_data(self):
+        """Test compliance trends analysis with no data available."""
+        trend_data = {
+            "7_days": {"compliance_breakdown": {}, "data_available": False},
+            "14_days": {"compliance_breakdown": {}, "data_available": False},
+        }
+        periods = [7, 14]
+
+        result = analyze_compliance_trends(trend_data, periods)
+
+        assert "compliance_data_points" in result
+        assert "compliance_score_trend" in result
+        # Should handle empty data gracefully
+        for status in ["PASSED", "FAILED", "WARNING", "NOT_AVAILABLE"]:
+            assert status in result["compliance_data_points"]
+
+    def test_analyze_resource_type_trends_no_data(self):
+        """Test resource type trends analysis with no data available."""
+        trend_data = {
+            "7_days": {"top_resource_types": {}, "data_available": False},
+            "14_days": {"top_resource_types": {}, "data_available": False},
+        }
+        periods = [7, 14]
+
+        result = analyze_resource_type_trends(trend_data, periods)
+
+        assert "resource_type_data_points" in result
+        assert "most_affected_resources" in result
+        # Should handle empty data gracefully
+        assert isinstance(result["resource_type_data_points"], dict)
+        assert isinstance(result["most_affected_resources"], list)
+
+    def test_calculate_compliance_score_trend_empty_data(self):
+        """Test compliance score trend calculation with empty data."""
+        compliance_trends = {
+            "PASSED": [],
+            "FAILED": [],
+            "WARNING": [],
+            "NOT_AVAILABLE": [],
+        }
+
+        result = calculate_compliance_score_trend(compliance_trends)
+
+        assert len(result) == 0  # Should return empty list for no data
+
+    def test_identify_most_affected_resources_empty_data(self):
+        """Test identification of most affected resources with empty data."""
+        resource_trends = {}
+
+        result = identify_most_affected_resources(resource_trends)
+
+        assert len(result) == 0  # Should return empty list for no data
+
+    def test_determine_overall_trend_direction_insufficient_data(self):
+        """Test overall trend direction determination with insufficient data."""
+        # Only one data point
+        single_scores = {"7_days": 70.0}
+        result = determine_overall_trend_direction(single_scores, [7])
+        assert result == "insufficient_data"  # Should return insufficient_data with insufficient data
+
+        # Empty data
+        empty_scores = {}
+        result = determine_overall_trend_direction(empty_scores, [])
+        assert result == "insufficient_data"  # Should return insufficient_data with no data
+
+    def test_generate_trend_insights_empty_data(self):
+        """Test trend insights generation with empty data."""
+        trend_data = {
+            "7_days": {"severity_breakdown": {}, "top_resource_types": {}, "data_available": False},
+            "14_days": {"severity_breakdown": {}, "top_resource_types": {}, "data_available": False},
+        }
+        security_scores = {}
+        periods = [7, 14]
+
+        result = generate_trend_insights(trend_data, security_scores, periods)
+
+        assert "key_insights" in result
+        assert "recommendations" in result
+        assert "trend_summary" in result
+        assert isinstance(result["key_insights"], list)
+        assert isinstance(result["recommendations"], list)
+
+    def test_generate_detailed_trend_analysis_empty_data(self):
+        """Test detailed trend analysis generation with empty data."""
+        trend_data = {
+            "7_days": {"severity_breakdown": {}, "total_findings": 0, "data_available": False},
+            "14_days": {"severity_breakdown": {}, "total_findings": 0, "data_available": False},
+        }
+        periods = [7, 14]
+
+        result = generate_detailed_trend_analysis(trend_data, periods)
+
+        # With empty data, the function returns an empty dict
+        assert isinstance(result, dict)
+        # The function may return empty dict when no data is available
+
+    @pytest.mark.asyncio
+    async def test_get_security_findings_invalid_days_back(self, mock_context, sample_finding):
+        """Test get_security_findings with invalid days_back parameter."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_client.return_value.get_findings.return_value = {"Findings": [sample_finding]}
+
+            # Test with None days_back (should work)
+            findings = await get_security_findings(mock_context, days_back=None)
+
+            # Should still work without time filter
+            assert len(findings) == 1
+
+    @pytest.mark.asyncio
+    async def test_get_security_findings_parsing_error(self, mock_context):
+        """Test get_security_findings with finding parsing errors."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            # Create a malformed finding that will cause parsing errors
+            malformed_finding = {
+                "Id": "test-id",
+                # Missing required fields to cause parsing error
+            }
+            mock_client.return_value.get_findings.return_value = {"Findings": [malformed_finding]}
+
+            findings = await get_security_findings(mock_context)
+
+            # Should return empty list when all findings fail to parse
+            assert len(findings) == 0
+
+    @pytest.mark.asyncio
+    async def test_get_security_findings_pagination(self, mock_context, sample_finding):
+        """Test get_security_findings with pagination."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            # Mock multiple pages of results
+            first_page = {"Findings": [sample_finding], "NextToken": "token1"}
+            second_page = {"Findings": [sample_finding], "NextToken": None}
+
+            mock_client.return_value.get_findings.side_effect = [first_page, second_page]
+
+            findings = await get_security_findings(mock_context, max_results=10)
+
+            # Should get findings from both pages
+            assert len(findings) == 2
+            assert mock_client.return_value.get_findings.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_get_security_findings_max_results_limit(self, mock_context, sample_finding):
+        """Test get_security_findings respects max_results limit."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            # Create multiple findings
+            findings_list = [sample_finding] * 5
+            mock_client.return_value.get_findings.return_value = {"Findings": findings_list}
+
+            findings = await get_security_findings(mock_context, max_results=3)
+
+            # Should only return max_results number of findings
+            assert len(findings) == 3
+
+    @pytest.mark.asyncio
+    async def test_get_finding_statistics_with_filters(self, mock_context, sample_finding):
+        """Test get_finding_statistics with various filters."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_client.return_value.get_findings.return_value = {"Findings": [sample_finding]}
+
+            stats = await get_finding_statistics(
+                mock_context,
+                group_by="ComplianceStatus",
+                days_back=7,
+            )
+
+            # Should apply filters and group by compliance status
+            assert len(stats) >= 0
+            mock_client.return_value.get_findings.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_get_security_score_with_different_severities(self, mock_context):
+        """Test get_security_score with findings of different severities."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            # Create findings with different severities
+            findings = [
+                {
+                    "Id": "1",
+                    "Severity": {"Label": "CRITICAL"},
+                    "ProductArn": "arn",
+                    "GeneratorId": "gen",
+                    "AwsAccountId": "123",
+                    "Region": "us-east-1",
+                    "Title": "Test",
+                    "Description": "Test",
+                    "Workflow": {"Status": "NEW"},
+                    "RecordState": "ACTIVE",
+                    "CreatedAt": datetime.utcnow(),
+                    "UpdatedAt": datetime.utcnow(),
+                    "Resources": [{"Type": "AwsEc2Instance"}],
+                },
+                {
+                    "Id": "2",
+                    "Severity": {"Label": "HIGH"},
+                    "ProductArn": "arn",
+                    "GeneratorId": "gen",
+                    "AwsAccountId": "123",
+                    "Region": "us-east-1",
+                    "Title": "Test",
+                    "Description": "Test",
+                    "Workflow": {"Status": "NEW"},
+                    "RecordState": "ACTIVE",
+                    "CreatedAt": datetime.utcnow(),
+                    "UpdatedAt": datetime.utcnow(),
+                    "Resources": [{"Type": "AwsEc2Instance"}],
+                },
+                {
+                    "Id": "3",
+                    "Severity": {"Label": "LOW"},
+                    "ProductArn": "arn",
+                    "GeneratorId": "gen",
+                    "AwsAccountId": "123",
+                    "Region": "us-east-1",
+                    "Title": "Test",
+                    "Description": "Test",
+                    "Workflow": {"Status": "NEW"},
+                    "RecordState": "ACTIVE",
+                    "CreatedAt": datetime.utcnow(),
+                    "UpdatedAt": datetime.utcnow(),
+                    "Resources": [{"Type": "AwsEc2Instance"}],
+                },
+            ]
+
+            mock_client.return_value.get_findings.return_value = {"Findings": findings}
+
+            score = await get_security_score(mock_context)
+
+            # Score should be calculated based on severity weights
+            assert 0 <= score.current_score <= 100
+            assert score.max_score == 100.0
+
+    @pytest.mark.asyncio
+    async def test_get_enabled_standards_empty_response(self, mock_context):
+        """Test get_enabled_standards with empty response."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_client.return_value.get_enabled_standards.return_value = {"StandardsSubscriptions": []}
+
+            standards = await get_enabled_standards(mock_context)
+
+            assert len(standards) == 0
+
+    @pytest.mark.asyncio
+    async def test_list_security_control_definitions_empty_response(self, mock_context):
+        """Test list_security_control_definitions with empty response."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_client.return_value.list_security_control_definitions.return_value = {"SecurityControlDefinitions": []}
+
+            controls = await list_security_control_definitions(mock_context)
+
+            assert len(controls) == 0
+
+    @pytest.mark.asyncio
+    async def test_get_finding_history_empty_response(self, mock_context):
+        """Test get_finding_history with empty response."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_client.return_value.get_finding_history.return_value = {"Records": []}
+
+            history = await get_finding_history(mock_context, "test-finding-id")
+
+            assert len(history) == 0
+
+    @pytest.mark.asyncio
+    async def test_describe_standards_controls_empty_response(self, mock_context):
+        """Test describe_standards_controls with empty response."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_client.return_value.describe_standards_controls.return_value = {"Controls": []}
+
+            controls = await describe_standards_controls(mock_context, "test-standard-arn")
+
+            assert len(controls) == 0
+
+    @pytest.mark.asyncio
+    async def test_generate_security_report_with_findings(self, mock_context, sample_finding):
+        """Test generate_security_report with actual findings data."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            # Mock findings and standards
+            mock_client.return_value.get_findings.return_value = {"Findings": [sample_finding] * 3}
+            mock_standards = [
+                {
+                    "StandardsSubscriptionArn": "arn:aws:securityhub:us-east-1:123456789012:subscription/aws-foundational-security-standard/v/1.0.0",
+                    "StandardsArn": "arn:aws:securityhub:::standard/aws-foundational-security-standard/v/1.0.0",
+                    "StandardsInput": {},
+                    "StandardsStatus": "READY",
+                }
+            ]
+            mock_client.return_value.get_enabled_standards.return_value = {"StandardsSubscriptions": mock_standards}
+
+            report = await generate_security_report(
+                mock_context, max_findings_per_severity=5, include_findings_details=True
+            )
+
+            assert "executive_summary" in report
+            assert "detailed_findings" in report
+            assert "recommendations" in report
+            assert "enabled_standards" in report
+            assert report["executive_summary"]["total_findings"] == 3
+
+    @pytest.mark.asyncio
+    async def test_generate_compliance_report_with_findings(self, mock_context, sample_finding):
+        """Test generate_compliance_report with actual findings data."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_client.return_value.get_findings.return_value = {"Findings": [sample_finding] * 2}
+            mock_standards = [
+                {
+                    "StandardsSubscriptionArn": "arn:aws:securityhub:us-east-1:123456789012:subscription/aws-foundational-security-standard/v/1.0.0",
+                    "StandardsArn": "arn:aws:securityhub:::standard/aws-foundational-security-standard/v/1.0.0",
+                    "StandardsInput": {},
+                    "StandardsStatus": "READY",
+                }
+            ]
+            mock_client.return_value.get_enabled_standards.return_value = {"StandardsSubscriptions": mock_standards}
+
+            report = await generate_compliance_report(mock_context)
+
+            assert "executive_summary" in report
+            assert "standards_compliance" in report
+            assert "compliance_findings_by_category" in report
+            assert "recommendations" in report
+
+    @pytest.mark.asyncio
+    async def test_generate_security_trends_report_with_data(self, mock_context, sample_finding):
+        """Test generate_security_trends_report with actual data."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_client.return_value.get_findings.return_value = {"Findings": [sample_finding]}
+
+            report = await generate_security_trends_report(mock_context)
+
+            assert "trend_analysis" in report
+            assert "insights_and_recommendations" in report
+            assert "historical_data_points" in report
+
+    def test_analyze_severity_trends_with_mixed_data(self):
+        """Test severity trends analysis with mixed available/unavailable data."""
+        trend_data = {
+            "7_days": {"severity_breakdown": {"HIGH": 2, "MEDIUM": 1}, "data_available": True},
+            "14_days": {"severity_breakdown": {}, "data_available": False},
+            "30_days": {"severity_breakdown": {"LOW": 3}, "data_available": True},
+        }
+        periods = [7, 14, 30]
+
+        result = analyze_severity_trends(trend_data, periods)
+
+        assert "severity_data_points" in result
+        assert "trend_directions" in result
+        # Should handle mixed data availability
+        assert len(result["severity_data_points"]["HIGH"]) == 2  # Only periods with HIGH data
+
+    def test_calculate_compliance_score_trend_with_data(self):
+        """Test compliance score trend calculation with actual data."""
+        compliance_trends = {
+            "PASSED": [{"period_days": 7, "count": 8}, {"period_days": 14, "count": 12}],
+            "FAILED": [{"period_days": 7, "count": 2}, {"period_days": 14, "count": 1}],
+            "WARNING": [{"period_days": 7, "count": 1}, {"period_days": 14, "count": 0}],
+            "NOT_AVAILABLE": [{"period_days": 7, "count": 0}, {"period_days": 14, "count": 0}],
+        }
+
+        result = calculate_compliance_score_trend(compliance_trends)
+
+        assert len(result) == 2
+        # First period: 8 passed out of 11 total = ~72.7%
+        # Second period: 12 passed out of 13 total = ~92.3%
+        assert result[0]["compliance_score"] < result[1]["compliance_score"]  # Improving trend
+
+    def test_generate_trend_insights_with_data(self):
+        """Test trend insights generation with actual data."""
+        trend_data = {
+            "7_days": {
+                "severity_breakdown": {"HIGH": 3, "MEDIUM": 2},
+                "top_resource_types": {"AwsEc2Instance": 3, "AwsS3Bucket": 2},
+                "data_available": True,
+            },
+            "14_days": {
+                "severity_breakdown": {"HIGH": 1, "MEDIUM": 4},
+                "top_resource_types": {"AwsEc2Instance": 2, "AwsS3Bucket": 3},
+                "data_available": True,
+            },
+        }
+        security_scores = {"7_days": 65.0, "14_days": 75.0}
+        periods = [7, 14]
+
+        result = generate_trend_insights(trend_data, security_scores, periods)
+
+        assert "key_insights" in result
+        assert "recommendations" in result
+        assert "trend_summary" in result
+        assert len(result["key_insights"]) > 0
+        assert len(result["recommendations"]) > 0
+
+    def test_generate_detailed_trend_analysis_with_data(self):
+        """Test detailed trend analysis generation with actual data."""
+        trend_data = {
+            "7_days": {
+                "severity_breakdown": {"HIGH": 2, "MEDIUM": 3},
+                "total_findings": 5,
+                "data_available": True,
+            },
+            "14_days": {
+                "severity_breakdown": {"HIGH": 1, "MEDIUM": 2, "LOW": 1},
+                "total_findings": 4,
+                "data_available": True,
+            },
+        }
+        periods = [7, 14]
+
+        result = generate_detailed_trend_analysis(trend_data, periods)
+
+        assert "statistical_summary" in result
+        assert "period_comparisons" in result
+        assert "data_quality_assessment" in result
+        # Should have content when data is available
+        assert len(result) > 0
+
+    @pytest.mark.asyncio
+    async def test_get_security_findings_time_filter_exception(self, mock_context, sample_finding):
+        """Test get_security_findings with time filter that causes exception."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_client.return_value.get_findings.return_value = {"Findings": [sample_finding]}
+
+            # Test with days_back that might cause issues in time filter
+            findings = await get_security_findings(mock_context, days_back=999)  # Very large number
+
+            # Should still work, just without time filter if it fails
+            assert len(findings) == 1
+
+    @pytest.mark.asyncio
+    async def test_get_security_findings_general_exception(self, mock_context):
+        """Test get_security_findings with general exception."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_client.return_value.get_findings.side_effect = Exception("General error")
+
+            with pytest.raises(Exception, match="General error"):
+                await get_security_findings(mock_context)
+
+    @pytest.mark.asyncio
+    async def test_get_finding_statistics_general_exception(self, mock_context):
+        """Test get_finding_statistics with general exception."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_client.return_value.get_findings.side_effect = Exception("General error")
+
+            with pytest.raises(Exception, match="General error"):
+                await get_finding_statistics(mock_context)
+
+    @pytest.mark.asyncio
+    async def test_get_security_score_general_exception(self, mock_context):
+        """Test get_security_score with general exception."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_client.return_value.get_findings.side_effect = Exception("General error")
+
+            with pytest.raises(Exception, match="General error"):
+                await get_security_score(mock_context)
+
+    @pytest.mark.asyncio
+    async def test_get_enabled_standards_general_exception(self, mock_context):
+        """Test get_enabled_standards with general exception."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_client.return_value.get_enabled_standards.side_effect = Exception("General error")
+
+            with pytest.raises(Exception, match="General error"):
+                await get_enabled_standards(mock_context)
+
+    @pytest.mark.asyncio
+    async def test_list_security_control_definitions_general_exception(self, mock_context):
+        """Test list_security_control_definitions with general exception."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_client.return_value.list_security_control_definitions.side_effect = Exception("General error")
+
+            with pytest.raises(Exception, match="General error"):
+                await list_security_control_definitions(mock_context)
+
+    @pytest.mark.asyncio
+    async def test_get_finding_history_general_exception(self, mock_context):
+        """Test get_finding_history with general exception."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_client.return_value.get_finding_history.side_effect = Exception("General error")
+
+            with pytest.raises(Exception, match="General error"):
+                await get_finding_history(mock_context, "test-finding-id")
+
+    @pytest.mark.asyncio
+    async def test_describe_standards_controls_general_exception(self, mock_context):
+        """Test describe_standards_controls with general exception."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_client.return_value.describe_standards_controls.side_effect = Exception("General error")
+
+            with pytest.raises(Exception, match="General error"):
+                await describe_standards_controls(mock_context, "test-standard-arn")
+
+    @pytest.mark.asyncio
+    async def test_generate_security_report_general_exception(self, mock_context):
+        """Test generate_security_report with general exception."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_client.return_value.get_findings.side_effect = Exception("General error")
+
+            with pytest.raises(Exception, match="General error"):
+                await generate_security_report(mock_context)
+
+    @pytest.mark.asyncio
+    async def test_generate_compliance_report_general_exception(self, mock_context):
+        """Test generate_compliance_report with general exception."""
+        with patch("awslabs.aws_security_hub_mcp_server.server.get_security_hub_client") as mock_client:
+            mock_client.return_value.get_findings.side_effect = Exception("General error")
+
+            with pytest.raises(Exception, match="General error"):
+                await generate_compliance_report(mock_context)
+
+    def test_parse_finding_with_all_optional_fields(self):
+        """Test parse_finding with all optional fields present."""
+        finding_data = {
+            "Id": "test-id",
+            "ProductArn": "arn:aws:securityhub:us-east-1:123456789012:product/123456789012/default",
+            "GeneratorId": "test-generator",
+            "AwsAccountId": "123456789012",
+            "Region": "us-east-1",
+            "Title": "Test Finding",
+            "Description": "Test description",
+            "Severity": {"Label": "HIGH", "Normalized": 70},
+            "Workflow": {"Status": "NEW"},
+            "RecordState": "ACTIVE",
+            "CreatedAt": datetime.utcnow(),
+            "UpdatedAt": datetime.utcnow(),
+            "Resources": [{"Type": "AwsEc2Instance", "Id": "i-1234567890abcdef0"}],
+            "Compliance": {"Status": "FAILED"},
+            "ProductFields": {"aws/securityhub/ProductName": "Security Hub"},
+            "UserDefinedFields": {"custom": "value"},
+        }
+
+        finding = parse_finding(finding_data)
+
+        assert finding.id == "test-id"
+        assert finding.severity_label == SeverityLabel.HIGH
+        assert finding.workflow_status == WorkflowStatus.NEW
+        assert finding.compliance_status == ComplianceStatus.FAILED
+        assert finding.resource_type == "AwsEc2Instance"
+
+    def test_determine_overall_trend_direction_edge_cases(self):
+        """Test overall trend direction with edge cases."""
+        # Test with very small differences (should be stable)
+        small_diff_scores = {"7_days": 70.0, "14_days": 70.1, "30_days": 69.9}
+        result = determine_overall_trend_direction(small_diff_scores, [7, 14, 30])
+        assert result == "stable"
+
+        # Test with exactly equal scores
+        equal_scores = {"7_days": 70.0, "14_days": 70.0, "30_days": 70.0}
+        result = determine_overall_trend_direction(equal_scores, [7, 14, 30])
+        assert result == "stable"

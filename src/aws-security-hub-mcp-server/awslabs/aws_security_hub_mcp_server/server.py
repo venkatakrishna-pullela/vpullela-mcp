@@ -153,17 +153,17 @@ def parse_finding(finding_data: dict[str, Any]) -> SecurityFinding:
         severity_enum = SeverityLabel(severity_label)
     except ValueError:
         severity_enum = SeverityLabel.INFORMATIONAL
-    
+
     try:
         workflow_enum = WorkflowStatus(workflow_status)
     except ValueError:
         workflow_enum = WorkflowStatus.NEW
-    
+
     try:
         record_state_enum = RecordState(finding_data.get("RecordState", "ACTIVE"))
     except ValueError:
         record_state_enum = RecordState.ACTIVE
-    
+
     compliance_enum = None
     if compliance_status:
         try:
