@@ -285,8 +285,8 @@ Enable debug logging by setting `FASTMCP_LOG_LEVEL=DEBUG` to see detailed API ca
 
 ## Contributing
 
-See the main repository [CONTRIBUTING.md](https://github.com/awslabs/mcp-server-collection/blob/main/CONTRIBUTING.md) for contribution guidelines.
+See the main repository [CONTRIBUTING.md](https://github.com/awslabs/mcp/blob/main/CONTRIBUTING.md) for contribution guidelines.
 
 ## License
 
-This project is licensed under the Apache License 2.0. See [LICENSE](https://github.com/awslabs/mcp-server-collection/blob/main/LICENSE) for details.
+This project is licensed under the Apache License 2.0. See [LICENSE](https://github.com/awslabs/mcp/blob/main/LICENSE) for details.
